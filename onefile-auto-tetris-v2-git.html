@@ -1,0 +1,2056 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autoplay Tetris</title>
+    <style>
+        /* Import Press Start 2P font for Game Over screen */
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            font-family: 'Press Start 2P', cursive;
+            color: white;
+            font-size: 14px;
+        }
+        
+        #game-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        #tetris-canvas {
+            background-color: #000;
+            display: block;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 30px;
+            border-radius: 5px;
+            text-align: center;
+            z-index: 10;
+            display: none;
+            font-family: 'Press Start 2P', cursive;
+        }
+        
+        #game-over h2 {
+            margin-bottom: 20px;
+            color: #ff5555;
+            font-size: 24px;
+        }
+        
+        #game-over p {
+            margin-bottom: 15px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        #restart-countdown {
+            margin-top: 10px;
+            color: #70a1ff;
+        }
+        
+        #strategy-controls {
+            display: none; /* Hide strategy controls */
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            z-index: 100;
+        }
+        
+        .strategy-button {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            background-color: #444;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+        }
+        
+        .strategy-button:hover {
+            background-color: #666;
+        }
+        
+        .strategy-button.active {
+            background-color: #70a1ff;
+        }
+        
+        .toggle-auto {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #444;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #70a1ff;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="tetris-canvas"></canvas>
+        <div id="game-over">
+            <h2>Game Over</h2>
+            <p>Lines Cleared: <span id="final-lines">0</span></p>
+            <p id="restart-countdown">Restarting in 3 seconds...</p>
+        </div>
+        
+        <div id="strategy-controls">
+            <h3 style="margin-top: 0; text-align: center;">AI Strategy</h3>
+            <button class="strategy-button" data-strategy="balanced">Balanced</button>
+            <button class="strategy-button" data-strategy="line-clear">Line Clear</button>
+            <button class="strategy-button" data-strategy="flat-stack">Flat Stack</button>
+            <button class="strategy-button" data-strategy="hole-avoid">Hole Avoid</button>
+            <button class="strategy-button" data-strategy="aggressive">Aggressive</button>
+            
+            <div class="toggle-auto">
+                <span>Auto Switch:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="auto-switch" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const GRID_SIZE = 20; // Fixed size of each grid cell in pixels
+        const COLORS = [
+            null,
+            '#FF0D72', // I piece (cyan)
+            '#0DC2FF', // J piece (blue)
+            '#0DFF72', // L piece (orange)
+            '#F538FF', // O piece (yellow)
+            '#FF8E0D', // S piece (green)
+            '#FFE138', // T piece (purple)
+            '#3877FF'  // Z piece (red)
+        ];
+
+        // Tetromino shapes definition
+        const TETROMINOS = [
+            null, // Empty (for 1-indexed array)
+            [
+                [0, 0, 0, 0],
+                [1, 1, 1, 1],
+                [0, 0, 0, 0],
+                [0, 0, 0, 0]
+            ], // I
+            [
+                [2, 0, 0],
+                [2, 2, 2],
+                [0, 0, 0]
+            ], // J
+            [
+                [0, 0, 3],
+                [3, 3, 3],
+                [0, 0, 0]
+            ], // L
+            [
+                [4, 4],
+                [4, 4]
+            ], // O
+            [
+                [0, 5, 5],
+                [5, 5, 0],
+                [0, 0, 0]
+            ], // S
+            [
+                [0, 6, 0],
+                [6, 6, 6],
+                [0, 0, 0]
+            ], // T
+            [
+                [7, 7, 0],
+                [0, 7, 7],
+                [0, 0, 0]
+            ] // Z
+        ];
+
+        // Game variables
+        let canvas, ctx;
+        let grid;
+        let linesTotal = 0;
+        const GAME_SPEED = 60; // Maximum speed (10 out of 10) for vertical falling
+        const HORIZONTAL_SPEED = 120; // Horizontal speed is 2x vertical speed
+        let gameOver = false;
+        let lastTime = 0;
+        let player = {
+            pos: {x: 0, y: 0},
+            piece: null
+        };
+        let moveDownTimer;
+        let rotateTimer;
+        let moveLeftRightTimer;
+        let aiThinkTimer;
+        let adaptiveStrategyTimer;
+        let COLS, ROWS;
+        
+        // AI strategy variables
+        const AI_STRATEGIES = {
+            LINE_CLEAR: 'line-clear',   // Focus on clearing lines
+            FLAT_STACK: 'flat-stack',   // Focus on creating a flat surface
+            HOLE_AVOID: 'hole-avoid',   // Focus on avoiding holes
+            AGGRESSIVE: 'aggressive',   // Extremely aggressive line clearing
+            BALANCED: 'balanced'        // Balanced approach (default)
+        };
+        
+        // Current AI strategy
+        let currentStrategy = AI_STRATEGIES.BALANCED;
+        // Switch AI strategy every 25 pieces for variety
+        let pieceCounter = 0;
+        const STRATEGY_CHANGE_INTERVAL = 25;
+        
+        // Strategy effectiveness tracking
+        const strategyStats = {
+            [AI_STRATEGIES.LINE_CLEAR]: { linesCleared: 0, piecesPlaced: 0 },
+            [AI_STRATEGIES.FLAT_STACK]: { linesCleared: 0, piecesPlaced: 0 },
+            [AI_STRATEGIES.HOLE_AVOID]: { linesCleared: 0, piecesPlaced: 0 },
+            [AI_STRATEGIES.AGGRESSIVE]: { linesCleared: 0, piecesPlaced: 0 },
+            [AI_STRATEGIES.BALANCED]: { linesCleared: 0, piecesPlaced: 0 }
+        };
+        
+        // Best strategy based on performance
+        let bestStrategy = null;
+        let learningPhase = true; // Initially in learning phase to test all strategies
+        
+        // Game setup
+        function setup() {
+            // Set up main canvas
+            canvas = document.getElementById('tetris-canvas');
+            ctx = canvas.getContext('2d');
+            
+            // Resize canvas to fill viewport
+            resizeGame();
+            
+            // Initialize the game
+            init();
+            
+            // Start the game loop
+            requestAnimationFrame(gameLoop);
+            
+            // Set up event listener for window resize
+            window.addEventListener('resize', handleResize);
+            
+            // Set up strategy control buttons
+            setupStrategyControls();
+        }
+        
+        function setupStrategyControls() {
+            // Strategy selection buttons
+            const strategyButtons = document.querySelectorAll('.strategy-button');
+            strategyButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    // Update UI
+                    strategyButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // Update strategy
+                    const strategy = button.getAttribute('data-strategy');
+                    currentStrategy = strategy;
+                    
+                    // Show notification
+                    showStrategyChange(strategy);
+                });
+                
+                // Set initial active button
+                if (button.getAttribute('data-strategy') === currentStrategy) {
+                    button.classList.add('active');
+                }
+            });
+            
+            // Auto switch toggle
+            const autoSwitchToggle = document.getElementById('auto-switch');
+            autoSwitchToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    // Reset piece counter if auto switch is enabled
+                    pieceCounter = 0;
+                }
+            });
+        }
+        
+        function handleResize() {
+            // Resize the game
+            resizeGame();
+            
+            // Restart the game with new dimensions
+            init();
+        }
+        
+        function resizeGame() {
+            // Set canvas to fill the viewport completely
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Recalculate cols and rows based on the new size
+            COLS = Math.floor(canvas.width / GRID_SIZE);
+            ROWS = Math.floor(canvas.height / GRID_SIZE);
+        }
+        
+        function init() {
+            // Reset game state
+            grid = createGrid();
+            linesTotal = 0;
+            gameOver = false;
+            
+            // Update UI
+            document.getElementById('game-over').style.display = 'none';
+            
+            // Create new piece
+            player.piece = createPiece(Math.floor(Math.random() * 7) + 1);
+            resetPlayer();
+            
+            // Set up auto-play timers
+            setUpAutoPlay();
+        }
+        
+        function createGrid() {
+            // Create an empty grid filled with 0s
+            return Array.from(Array(ROWS), () => Array(COLS).fill(0));
+        }
+        
+        function createPiece(type) {
+            return {
+                // Clone the piece matrix from TETROMINOS
+                matrix: TETROMINOS[type].map(row => [...row]),
+                type: type
+            };
+        }
+        
+        function resetPlayer() {
+            // Position the piece at the top center of the grid
+            player.pos.y = 0;
+            player.pos.x = Math.floor(COLS / 2) - Math.floor(player.piece.matrix[0].length / 2);
+            
+            // Track piece for current strategy
+            strategyStats[currentStrategy].piecesPlaced++;
+            
+            // Increment piece counter and check if we should switch AI strategy
+            pieceCounter++;
+            if (pieceCounter >= STRATEGY_CHANGE_INTERVAL) {
+                pieceCounter = 0;
+                changeAIStrategy();
+            }
+            
+            // Reset movement state to planning for the new piece
+            movementState = "planning";
+            moveCounter = 0;
+            rotationNeeded = 0;
+            
+            // Check if the new piece immediately collides (game over condition)
+            if (checkCollision()) {
+                gameOver = true;
+                showGameOver();
+            }
+        }
+        
+        function setUpAutoPlay() {
+            // Clear any existing auto-play timers
+            clearInterval(moveDownTimer);
+            clearInterval(aiThinkTimer);
+            clearInterval(adaptiveStrategyTimer);
+            
+            // Set up unified movement system with AI decision making
+            // This timer handles all movement: rotation, horizontal, and vertical
+            moveDownTimer = setInterval(() => {
+                // Only drop the piece every other tick to slow down vertical movement
+                // while keeping horizontal movement more responsive
+                if (moveCounter % 2 === 0) {
+                    movePlayer(0, 1); // Move down every other tick
+                }
+                
+                // Make horizontal movement decisions each tick
+                moveHorizontally();
+                
+                // Increment counter for tracking
+                moveCounter++;
+            }, 50); // Fast timer for responsive movement
+            
+            // Set up AI thinking - planning where to place pieces
+            aiThinkTimer = setInterval(() => {
+                planNextMove();
+            }, 100); // Plan moves frequently
+            
+            // Set up adaptive strategy analysis
+            adaptiveStrategyTimer = setInterval(() => {
+                analyzeAndAdaptStrategy();
+            }, 2000); // Check board state every 2 seconds
+            
+            // Reset move counter for AI
+            moveCounter = 0;
+            moveDirection = 0;
+            rotationNeeded = 0;
+        }
+        
+        // Movement variables
+        let moveCounter = 0;
+        let moveDirection = 0; // -1: left, 0: none, 1: right
+        let rotationNeeded = 0;
+        let targetColumn = 0;
+        let movementState = "planning"; // planning, rotating, moving, dropping
+        
+        // Function to plan the next move - this is called regularly to ensure the AI is always updated
+        function planNextMove() {
+            // Only plan if we're in planning state or when we've reached our target column
+            if (movementState === "planning" || player.pos.x === targetColumn) {
+                const bestMove = findBestMove();
+                rotationNeeded = bestMove.rotation;
+                targetColumn = bestMove.column;
+                
+                // Determine what to do next
+                if (rotationNeeded > 0) {
+                    movementState = "rotating";
+                } else {
+                    movementState = "moving";
+                }
+            }
+        }
+        
+        // Unified function to handle all piece movement
+        function moveHorizontally() {
+            // If we're in game over state, don't move
+            if (gameOver) return;
+            
+            // Process rotations first
+            if (movementState === "rotating" && rotationNeeded > 0) {
+                rotatePlayer();
+                rotationNeeded--;
+                
+                // If we're done rotating, update state
+                if (rotationNeeded <= 0) {
+                    movementState = "moving";
+                }
+                
+                // Skip horizontal movement this frame to avoid simultaneous rotation and movement
+                return;
+            }
+            
+            // Handle horizontal movement state
+            if (movementState === "moving") {
+                // Don't move if we're already at the target column
+                if (player.pos.x === targetColumn) {
+                    movementState = "dropping"; // Switch to dropping state
+                    return;
+                }
+                
+                // Get board metrics for smart movement
+                const heights = getColumnHeights();
+                const horizontalGaps = detectHorizontalGaps(grid, heights);
+                const pieceMatrix = player.piece.matrix;
+                const landingY = getSoftLandingHeight(player.pos.x, pieceMatrix);
+                const gapInfo = checkFillsHorizontalGapWithInfo(pieceMatrix, player.pos.x, landingY, horizontalGaps);
+                
+                // Determine distance and direction to target
+                const distanceToTarget = Math.abs(player.pos.x - targetColumn);
+                const isAboveGap = gapInfo.fills;
+                
+                // Determine movement direction
+                if (player.pos.x < targetColumn) {
+                    moveDirection = 1; // Move right
+                } else if (player.pos.x > targetColumn) {
+                    moveDirection = -1; // Move left
+                } else {
+                    moveDirection = 0; // Already at target
+                }
+                
+                // Move according to our rules
+                if (moveDirection !== 0) {
+                    // Closer to edges - move at full speed to ensure we can reach the sides
+                    if (targetColumn <= 1 || targetColumn >= COLS - 2) {
+                        movePlayer(moveDirection, 0);
+                    }
+                    // If we're close to the target and above a gap - move more carefully
+                    else if (distanceToTarget <= 2 && isAboveGap) {
+                        // 25% chance to pause movement to allow the piece to fall more
+                        if (Math.random() > 0.25) {
+                            movePlayer(moveDirection, 0);
+                        }
+                    }
+                    // Normal case - move at regular speed
+                    else {
+                        movePlayer(moveDirection, 0);
+                    }
+                }
+            }
+            
+            // In dropping state, we just let the piece fall until it lands
+            // The main timer handles the down movement
+        }
+        
+        // Calculate the soft landing height for a piece at a given x position
+        function getSoftLandingHeight(column, pieceMatrix) {
+            const pieceWidth = pieceMatrix[0].length;
+            const pieceHeight = pieceMatrix.length;
+            
+            // Find the highest point in each column under the piece
+            let highestPointsUnderPiece = [];
+            for (let x = 0; x < pieceWidth; x++) {
+                if (column + x >= COLS) continue;
+                
+                let highestPoint = ROWS;
+                for (let y = 0; y < ROWS; y++) {
+                    if (grid[y][column + x] !== 0) {
+                        highestPoint = y;
+                        break;
+                    }
+                }
+                highestPointsUnderPiece.push(highestPoint);
+            }
+            
+            if (highestPointsUnderPiece.length === 0) return 0;
+            
+            // Find the minimum height where the piece can land
+            let landingY = Math.min(...highestPointsUnderPiece) - pieceHeight;
+            return Math.max(0, landingY);
+        }
+        
+        function findBestMove() {
+            // Find the best possible move considering all rotations and positions
+            let bestScore = -Infinity;
+            let bestRotation = 0;
+            let bestColumn = 0;
+            
+            // Calculate heights of each column
+            const heights = getColumnHeights();
+            
+            // Try each possible rotation
+            // O piece (type 4) has only 1 rotation, I piece (type 1) has 2 rotations, others have 4
+            const maxRotations = 
+                player.piece.type === 4 ? 1 : 
+                player.piece.type === 1 ? 2 : 4;
+            
+            for (let rotation = 0; rotation < maxRotations; rotation++) {
+                // Create a copy of the current piece matrix
+                const originalMatrix = player.piece.matrix.map(row => [...row]);
+                
+                // Apply rotation
+                let testMatrix = originalMatrix;
+                for (let r = 0; r < rotation; r++) {
+                    testMatrix = rotateMatrix(testMatrix);
+                }
+                
+                // Try each possible column position
+                const pieceWidth = testMatrix[0].length;
+                for (let column = 0; column <= COLS - pieceWidth; column++) {
+                    // Calculate what the grid would look like with this move
+                    const { score, numberOfHoles, linesClear, landingHeight } = evaluateMove(testMatrix, column, heights);
+                    
+                    // Higher score is better
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestRotation = rotation;
+                        bestColumn = column;
+                    }
+                }
+            }
+            
+            return { rotation: bestRotation, column: bestColumn };
+        }
+        
+        function getColumnHeights() {
+            // Calculate heights of each column
+            const heights = Array(COLS).fill(0);
+            
+            // Determine the height of each column
+            for (let x = 0; x < COLS; x++) {
+                let y;
+                for (y = 0; y < ROWS; y++) {
+                    if (grid[y][x] !== 0) {
+                        heights[x] = y;
+                        break;
+                    }
+                }
+                if (y === ROWS) {
+                    heights[x] = ROWS; // Empty column
+                }
+            }
+            
+            return heights;
+        }
+        
+        function evaluateMove(pieceMatrix, column, heights) {
+            // Create a temporary grid to simulate the move
+            const tempGrid = grid.map(row => [...row]);
+            const pieceWidth = pieceMatrix[0].length;
+            const pieceHeight = pieceMatrix.length;
+            
+            // Find landing height for this column
+            let landingY = 0;
+            const columnHeights = heights.slice(column, column + pieceWidth);
+            if (columnHeights.length === 0) {
+                // Fallback if the piece width exceeds the grid
+                return { score: -99999, numberOfHoles: 999, linesClear: 0, landingHeight: 0 };
+            }
+            landingY = Math.min(...columnHeights) - pieceHeight;
+            landingY = Math.max(0, landingY); // Don't go above the grid
+            // Store the landing height for return value
+            const landingHeight = landingY;
+            
+            // Add a slight bonus for edge columns to encourage AI to use the full width
+            // This helps ensure the AI can reach and use columns at the edges of the board
+            let edgeBonus = 0;
+            if (column <= 1 || column >= COLS - pieceWidth - 1) {
+                edgeBonus = 5; // Small bonus for using edge columns
+            }
+            
+            // Place the piece in the temp grid
+            for (let y = 0; y < pieceHeight; y++) {
+                for (let x = 0; x < pieceWidth; x++) {
+                    if (pieceMatrix[y][x] !== 0) {
+                        if (landingY + y < ROWS && column + x < COLS) {
+                            tempGrid[landingY + y][column + x] = pieceMatrix[y][x];
+                        }
+                    }
+                }
+            }
+            
+            // Count completed lines
+            let linesClear = 0;
+            for (let y = 0; y < ROWS; y++) {
+                if (tempGrid[y].every(value => value !== 0)) {
+                    linesClear++;
+                }
+            }
+            
+            // Count holes (empty spaces with blocks above them)
+            let numberOfHoles = 0;
+            for (let x = 0; x < COLS; x++) {
+                let foundBlock = false;
+                for (let y = 0; y < ROWS; y++) {
+                    if (tempGrid[y][x] !== 0) {
+                        foundBlock = true;
+                    } else if (foundBlock) {
+                        numberOfHoles++;
+                    }
+                }
+            }
+            
+            // Calculate bumpiness (sum of absolute differences between adjacent columns)
+            let bumpiness = 0;
+            for (let x = 0; x < COLS - 1; x++) {
+                bumpiness += Math.abs(heights[x] - heights[x + 1]);
+            }
+            
+            // Calculate aggregated height
+            const aggregateHeight = heights.reduce((sum, height) => sum + (ROWS - height), 0);
+            
+            // Check for flat land gaps (isolated empty cells on flat surfaces)
+            let flatLandGapPenalty = 0;
+            for (let x = 1; x < COLS - 1; x++) {
+                // Check if three adjacent columns have the same height
+                if (heights[x-1] === heights[x+1] && heights[x] > heights[x-1]) {
+                    // This is a flat land gap where the middle column is higher
+                    flatLandGapPenalty += 25 * (heights[x] - heights[x-1]); // Increased from 15 to 25
+                }
+                
+                // Additional check for wells or U-shaped gaps
+                if (heights[x] < heights[x-1] && heights[x] < heights[x+1]) {
+                    // Calculate depth of well
+                    const leftDepth = heights[x-1] - heights[x];
+                    const rightDepth = heights[x+1] - heights[x];
+                    const depthPenalty = Math.min(leftDepth, rightDepth);
+                    
+                    // Apply stronger penalty for deeper wells
+                    flatLandGapPenalty += 20 * depthPenalty; // New penalty for wells
+                    
+                    // Extra penalty for gaps at the edges, which are harder to fill
+                    if (x === 1 || x === COLS - 2) {
+                        flatLandGapPenalty += 15; // Additional penalty for edge gaps
+                    }
+                }
+            }
+            
+            // Determine weights based on current AI strategy
+            let weights;
+            
+            switch (currentStrategy) {
+                case AI_STRATEGIES.LINE_CLEAR:
+                    // Line clear focused strategy - prioritizes completing lines above all else
+                    weights = {
+                        linesClear: 150.0,       // Extremely high priority on clearing lines (INCREASED MORE)
+                        holes: -40.0,            // Strongly avoid holes (INCREASED MORE)
+                        bumpiness: -1.0,         // Low focus on surface evenness
+                        aggregateHeight: -0.2    // Very low penalty for height
+                    };
+                    break;
+                    
+                case AI_STRATEGIES.FLAT_STACK:
+                    // Flat stack strategy - prioritizes keeping a flat, even surface
+                    weights = {
+                        linesClear: 60.0,        // Higher priority on clearing lines (INCREASED MORE)
+                        holes: -50.0,            // Strong avoidance of holes (INCREASED MORE)
+                        bumpiness: -6.0,         // Very high priority on surface evenness (INCREASED)
+                        aggregateHeight: -0.5    // Low penalty for height
+                    };
+                    break;
+                    
+                case AI_STRATEGIES.HOLE_AVOID:
+                    // Hole avoidance strategy - avoiding creating holes is paramount
+                    weights = {
+                        linesClear: 50.0,        // Medium priority on clearing lines (INCREASED MORE)
+                        holes: -100.0,           // Extreme avoidance of holes (INCREASED MORE)
+                        bumpiness: -4.0,         // Higher priority on surface evenness (INCREASED)
+                        aggregateHeight: -0.5    // Low penalty for height
+                    };
+                    break;
+                    
+                case AI_STRATEGIES.AGGRESSIVE:
+                    // Aggressive strategy - focuses on line clearing with less regard for holes
+                    weights = {
+                        linesClear: 180.0,       // Maximum priority on clearing lines (INCREASED MORE)
+                        holes: -20.0,            // Moderate penalty for holes (INCREASED)
+                        bumpiness: -1.0,         // Low priority on surface evenness
+                        aggregateHeight: -1.5    // Reduced penalty for height to allow taller stacks (DECREASED)
+                    };
+                    break;
+                    
+                case AI_STRATEGIES.BALANCED:
+                default:
+                    // Balanced strategy (default) - good balance of all considerations
+                    weights = {
+                        linesClear: 100.0,       // Very high priority on clearing lines (INCREASED MORE)
+                        holes: -60.0,            // Very high avoidance of holes (INCREASED MORE)
+                        bumpiness: -3.0,         // Higher priority on surface evenness
+                        aggregateHeight: -0.7    // Slightly reduced penalty for height (DECREASED)
+                    };
+                    break;
+            }
+            
+            // Apply piece-specific placement rules with enhanced gap-filling logic
+            let pieceSpecificBonus = 0;
+            
+            // Get piece type from the first non-zero value in the matrix
+            let pieceType = 0;
+            for (let y = 0; pieceType === 0 && y < pieceMatrix.length; y++) {
+                for (let x = 0; x < pieceMatrix[y].length; x++) {
+                    if (pieceMatrix[y][x] !== 0) {
+                        pieceType = pieceMatrix[y][x];
+                        break;
+                    }
+                }
+            }
+            
+            // Find horizontal gaps in the board
+            const horizontalGaps = detectHorizontalGaps(tempGrid, heights);
+            
+            // T piece (type 6) - prefer T spins (horizontal on flat surfaces, vertical in gaps)
+            if (pieceType === 6) {
+                const isHorizontal = pieceMatrix[1].every(cell => cell !== 0);
+                const isFlat = bumpiness < 3; // Check if the surface is relatively flat
+                
+                // Check if this placement would fill a horizontal gap
+                // Check for priority gaps (flat land gaps)
+                const gapInfo = checkFillsHorizontalGapWithInfo(pieceMatrix, column, landingY, horizontalGaps);
+                if (gapInfo.fills) {
+                    if (gapInfo.isPriority) {
+                        pieceSpecificBonus += 100; // Maximum bonus for priority gaps (flat land gaps) (INCREASED)
+                    } else {
+                        pieceSpecificBonus += 70; // Very strong bonus for regular horizontal gaps (INCREASED)
+                    }
+                } else if (isHorizontal && isFlat) {
+                    pieceSpecificBonus += 30; // Bonus for horizontal T on flat surfaces (INCREASED)
+                } else if (!isHorizontal && numberOfHoles > 0) {
+                    pieceSpecificBonus += 25; // Bonus for vertical T when there are holes to fill (INCREASED)
+                }
+            }
+            
+            // S, Z pieces (types 5, 7) - favor horizontal placements that fill gaps
+            else if (pieceType === 5 || pieceType === 7) {
+                const isHorizontal = pieceMatrix[0].some(cell => cell !== 0) && 
+                                    pieceMatrix[1].some(cell => cell !== 0);
+                
+                // Check if this placement would fill a horizontal gap
+                const gapInfo = checkFillsHorizontalGapWithInfo(pieceMatrix, column, landingY, horizontalGaps);
+                if (gapInfo.fills) {
+                    if (gapInfo.isPriority) {
+                        pieceSpecificBonus += 90; // Extra strong bonus for priority gaps (flat land gaps) (INCREASED)
+                    } else {
+                        pieceSpecificBonus += 65; // Strong bonus for regular horizontal gaps (INCREASED)
+                    }
+                } else if (isHorizontal && bumpiness < 3) {
+                    pieceSpecificBonus += 25; // Prefer horizontal S/Z on flat surfaces (INCREASED)
+                } else if (!isHorizontal && numberOfHoles > 0) {
+                    pieceSpecificBonus += 20; // Vertical S/Z to fill gaps (INCREASED)
+                }
+            }
+            
+            // L, J pieces (types 2, 3) - versatile pieces that can fill various gaps
+            else if (pieceType === 2 || pieceType === 3) {
+                const isHorizontal = pieceMatrix[1].filter(cell => cell !== 0).length >= 2;
+                
+                // Check if this placement would fill a horizontal gap
+                const gapInfo = checkFillsHorizontalGapWithInfo(pieceMatrix, column, landingY, horizontalGaps);
+                if (gapInfo.fills) {
+                    if (gapInfo.isPriority) {
+                        pieceSpecificBonus += 85; // Extra strong bonus for priority gaps (flat land gaps) (INCREASED)
+                    } else {
+                        pieceSpecificBonus += 60; // Strong bonus for regular horizontal gaps (INCREASED)
+                    }
+                } else if (isHorizontal && bumpiness < 3) {
+                    pieceSpecificBonus += 25; // Prefer horizontal L/J on flat surfaces (INCREASED)
+                } else if (!isHorizontal && numberOfHoles > 0) {
+                    pieceSpecificBonus += 20; // Vertical L/J to fill gaps (INCREASED)
+                }
+            }
+            
+            // I piece (type 1) - great for clearing lines and filling horizontal gaps
+            else if (pieceType === 1) {
+                const isHorizontal = pieceMatrix[0].length > pieceMatrix.length;
+                
+                // Check if this placement would fill a horizontal gap (I pieces are great for this)
+                if (isHorizontal) {
+                    const gapInfo = checkFillsHorizontalGapWithInfo(pieceMatrix, column, landingY, horizontalGaps);
+                    if (gapInfo.fills) {
+                        if (gapInfo.isPriority) {
+                            pieceSpecificBonus += 120; // Maximum bonus for I pieces filling priority gaps (INCREASED)
+                        } else {
+                            pieceSpecificBonus += 80; // Extremely strong bonus for I pieces filling horizontal gaps (INCREASED)
+                        }
+                    } 
+                    // Bonus for positions that would clear lines
+                    else if (linesClear > 0) {
+                        pieceSpecificBonus += linesClear * 35; // Strong bonus for clearing lines (ADDED)
+                    } 
+                    else if (bumpiness < 3) {
+                        pieceSpecificBonus += 25; // Bonus for horizontal I on flat surfaces (ADDED)
+                    }
+                } 
+                else if (!isHorizontal && numberOfHoles > 0) {
+                    // Vertical I pieces are good for filling tall gaps
+                    pieceSpecificBonus += 30; // Bonus for vertical I with holes present (ADDED)
+                }
+            }
+            
+            // O piece (type 4) - less versatile but can still fill some gaps
+            else if (pieceType === 4) {
+                // Check if this placement would fill a horizontal gap
+                const gapInfo = checkFillsHorizontalGapWithInfo(pieceMatrix, column, landingY, horizontalGaps);
+                if (gapInfo.fills) {
+                    if (gapInfo.isPriority) {
+                        pieceSpecificBonus += 70; // Extra bonus for priority gaps (flat land gaps) (INCREASED)
+                    } else {
+                        pieceSpecificBonus += 50; // Bonus for filling horizontal gaps with O pieces (INCREASED)
+                    }
+                } 
+                // Bonus for clearing lines
+                else if (linesClear > 0) {
+                    pieceSpecificBonus += linesClear * 30; // Strong bonus for clearing lines (ADDED)
+                }
+                // O pieces are also good for creating flat surfaces
+                else if (bumpiness < 3) {
+                    pieceSpecificBonus += 20; // Bonus for placing on flat surfaces (ADDED)
+                }
+            }
+            
+            // Calculate score based on weights, metrics, and piece-specific bonuses
+            const score = 
+                linesClear * weights.linesClear + 
+                numberOfHoles * weights.holes + 
+                bumpiness * weights.bumpiness + 
+                aggregateHeight * weights.aggregateHeight + 
+                pieceSpecificBonus - 
+                flatLandGapPenalty + // Apply penalty for flat land gaps
+                edgeBonus; // Add bonus for using edge columns
+            
+            return { score, numberOfHoles, linesClear, landingHeight };
+        }
+        
+        function gameLoop(time = 0) {
+            const deltaTime = time - lastTime;
+            lastTime = time;
+            
+            // Draw game state
+            drawGame();
+            
+            // Request next animation frame
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function drawGame() {
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw the grid
+            drawGrid();
+            
+            // Draw shadow of where piece will land
+            drawShadow();
+            
+            // Draw the current piece
+            drawPiece(player.piece.matrix, player.pos, player.piece.type);
+        }
+        
+        // Draw a shadow projection of where the current piece will land
+        function drawShadow() {
+            // Calculate landing position
+            const landingY = getSoftLandingHeight(player.pos.x, player.piece.matrix);
+            
+            // Only draw shadow if landing position is different from current position
+            if (landingY > player.pos.y) {
+                const shadowPos = {
+                    x: player.pos.x,
+                    y: landingY
+                };
+                
+                // Draw shadow with semi-transparent effect
+                drawPiece(
+                    player.piece.matrix, 
+                    shadowPos, 
+                    player.piece.type, 
+                    true   // This indicates it's a shadow
+                );
+            }
+        }
+        
+        function drawGrid() {
+            // Draw filled cells from the grid
+            grid.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        ctx.fillStyle = COLORS[value];
+                        ctx.fillRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                        
+                        // Draw cell border
+                        ctx.strokeStyle = '#444';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                    }
+                });
+            });
+        }
+        
+        function drawPiece(matrix, offset, type, isShadow = false) {
+            matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        if (isShadow) {
+                            // Draw shadow piece with ghost effect (semi-transparent)
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; // Very light
+                            ctx.fillRect(
+                                (x + offset.x) * GRID_SIZE,
+                                (y + offset.y) * GRID_SIZE,
+                                GRID_SIZE,
+                                GRID_SIZE
+                            );
+                            
+                            // Draw an outline over the shadow piece
+                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(
+                                (x + offset.x) * GRID_SIZE + 1,
+                                (y + offset.y) * GRID_SIZE + 1,
+                                GRID_SIZE - 2,
+                                GRID_SIZE - 2
+                            );
+                        } else {
+                            // Draw normal piece
+                            ctx.fillStyle = COLORS[type];
+                            ctx.fillRect(
+                                (x + offset.x) * GRID_SIZE,
+                                (y + offset.y) * GRID_SIZE,
+                                GRID_SIZE,
+                                GRID_SIZE
+                            );
+                            
+                            // Draw cell border
+                            ctx.strokeStyle = '#444';
+                            ctx.lineWidth = 1;
+                            ctx.strokeRect(
+                                (x + offset.x) * GRID_SIZE,
+                                (y + offset.y) * GRID_SIZE,
+                                GRID_SIZE,
+                                GRID_SIZE
+                            );
+                        }
+                    }
+                });
+            });
+        }
+        
+        // Calculate how far down a piece can go before landing
+        function getSoftLandingHeight(pieceX, pieceMatrix) {
+            let testY = player.pos.y;
+            
+            // Clone player position to test with
+            const testPos = {
+                x: pieceX,
+                y: testY
+            };
+            
+            // Keep moving down until collision
+            while (!checkCollisionAt(pieceMatrix, testPos)) {
+                testY++;
+                testPos.y = testY;
+            }
+            
+            // Back up one step to the last valid position
+            return testY - 1;
+        }
+        
+        // Check collision at a specific position
+        function checkCollisionAt(matrix, pos) {
+            for (let y = 0; y < matrix.length; y++) {
+                for (let x = 0; x < matrix[y].length; x++) {
+                    if (
+                        matrix[y][x] !== 0 && 
+                        (
+                            // Check if out of bounds
+                            grid[y + pos.y] === undefined ||
+                            grid[y + pos.y][x + pos.x] === undefined ||
+                            // Check if collides with filled cell
+                            grid[y + pos.y][x + pos.x] !== 0
+                        )
+                    ) {
+                        return true; // Collision detected
+                    }
+                }
+            }
+            
+            return false; // No collision
+        }
+        
+        function movePlayer(offsetX, offsetY) {
+            player.pos.x += offsetX;
+            player.pos.y += offsetY;
+            
+            // Check if move is valid
+            if (checkCollision()) {
+                player.pos.x -= offsetX;
+                player.pos.y -= offsetY;
+                
+                // If we were moving down and collided, merge the piece with the grid
+                if (offsetY > 0) {
+                    // Store last piece position for animated effects
+                    const lastPiecePos = {
+                        x: player.pos.x,
+                        y: player.pos.y,
+                        matrix: JSON.parse(JSON.stringify(player.piece.matrix)),
+                        type: player.piece.type
+                    };
+                    
+                    mergePiece();
+                    
+                    // We don't need to increment piece counter here since it's handled in resetPlayer()
+                    
+                    // Create new piece
+                    player.piece = createPiece(Math.floor(Math.random() * 7) + 1);
+                    resetPlayer();
+                    
+                    // If we merged a piece, highlight it briefly before clearing lines
+                    highlightLastPlacement(lastPiecePos, () => {
+                        clearLines();
+                    });
+                }
+            }
+        }
+        
+        function changeAIStrategy() {
+            // Check if auto switching is enabled
+            const autoSwitchToggle = document.getElementById('auto-switch');
+            if (!autoSwitchToggle.checked) {
+                return; // Don't auto-change if toggle is off
+            }
+            
+            // If we've used all strategies at least once and have enough data, exit learning phase
+            const allStrategiesTested = Object.values(strategyStats).every(stat => stat.piecesPlaced >= STRATEGY_CHANGE_INTERVAL);
+            if (learningPhase && allStrategiesTested) {
+                learningPhase = false;
+                determineBestStrategy();
+            }
+            
+            // If we're in learning phase, cycle through strategies to gather data
+            if (learningPhase) {
+                // Prioritize line clearing strategies during learning
+                const strategyPriority = [
+                    AI_STRATEGIES.LINE_CLEAR,      // Prioritize line clearing first
+                    AI_STRATEGIES.AGGRESSIVE,      // Then aggressive play
+                    AI_STRATEGIES.BALANCED,        // Then balanced approach
+                    AI_STRATEGIES.HOLE_AVOID,      // Then hole avoidance
+                    AI_STRATEGIES.FLAT_STACK       // Then flat stacking last
+                ];
+                
+                // Find current strategy in the priority list
+                const currentIndex = strategyPriority.indexOf(currentStrategy);
+                const nextIndex = (currentIndex + 1) % strategyPriority.length;
+                currentStrategy = strategyPriority[nextIndex];
+            } else {
+                // In execution phase, use the most effective strategy
+                currentStrategy = bestStrategy || AI_STRATEGIES.LINE_CLEAR;
+            }
+            
+            // Update UI
+            const strategyButtons = document.querySelectorAll('.strategy-button');
+            strategyButtons.forEach(btn => {
+                if (btn.getAttribute('data-strategy') === currentStrategy) {
+                    strategyButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Display current strategy on screen (temporarily)
+            showStrategyChange(currentStrategy);
+        }
+        
+        function showStrategyChange(strategy) {
+            // Create or get strategy notification element
+            let notification = document.getElementById('strategy-notification');
+            if (!notification) {
+                notification = document.createElement('div');
+                notification.id = 'strategy-notification';
+                notification.style.position = 'absolute';
+                notification.style.top = '10px';
+                notification.style.left = '10px';
+                notification.style.padding = '5px 10px';
+                notification.style.background = 'rgba(0, 0, 0, 0.7)';
+                notification.style.color = '#fff';
+                notification.style.fontFamily = 'Arial, sans-serif';
+                notification.style.fontSize = '16px';
+                notification.style.borderRadius = '5px';
+                notification.style.zIndex = '1000';
+                notification.style.transition = 'opacity 0.5s ease-in-out';
+                document.body.appendChild(notification);
+            }
+            
+            // Update and show notification
+            let strategyName = strategy.replace('-', ' ').toUpperCase();
+            notification.textContent = `Strategy: ${strategyName}`;
+            notification.style.opacity = '1';
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+            }, 3000);
+        }
+        
+        function rotatePlayer() {
+            const originalMatrix = player.piece.matrix;
+            
+            // Create a rotated version of the piece matrix
+            const newMatrix = rotateMatrix(player.piece.matrix);
+            player.piece.matrix = newMatrix;
+            
+            // Check if the rotation is valid
+            if (checkCollision()) {
+                // If not valid, try shifting the piece left or right to make it fit
+                const originalX = player.pos.x;
+                let offset = 1;
+                
+                // Try shifting right and left
+                while (checkCollision()) {
+                    player.pos.x += offset;
+                    offset = -(offset + (offset > 0 ? 1 : -1));
+                    
+                    // If we've tried shifting too far, revert the rotation
+                    if (offset > player.piece.matrix[0].length) {
+                        player.piece.matrix = originalMatrix;
+                        player.pos.x = originalX;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        function rotateMatrix(matrix) {
+            // Transpose the matrix
+            const result = matrix[0].map((_, i) => matrix.map(row => row[i]));
+            
+            // Reverse each row to get a 90-degree clockwise rotation
+            result.forEach(row => row.reverse());
+            
+            return result;
+        }
+        
+        function checkCollision() {
+            // Use the more generic checkCollisionAt function with the current player position and matrix
+            return checkCollisionAt(player.piece.matrix, player.pos);
+        }
+        
+        function mergePiece() {
+            player.piece.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        grid[y + player.pos.y][x + player.pos.x] = player.piece.type;
+                    }
+                });
+            });
+        }
+        
+        // Track rows that are ready to clear for animation
+        let rowsToClear = [];
+        let animationInProgress = false;
+        
+        function clearLines() {
+            // If animation is already in progress, don't start another one
+            if (animationInProgress) {
+                return 0;
+            }
+            
+            let linesCleared = 0;
+            rowsToClear = []; // Reset rows to clear
+            
+            // First, identify all rows that need to be cleared
+            for (let y = grid.length - 1; y >= 0; y--) {
+                if (grid[y].every(value => value !== 0)) {
+                    rowsToClear.push(y);
+                    linesCleared++;
+                }
+            }
+            
+            // If we have lines to clear, start the animation
+            if (linesCleared > 0) {
+                animateClearLines(rowsToClear, () => {
+                    // After animation completes, actually remove the rows
+                    finalizeClearLines(rowsToClear);
+                    // Update lines total 
+                    updateLinesTotal(linesCleared);
+                    
+                    // Animation is complete, reset flag
+                    animationInProgress = false;
+                });
+                
+                // Set animation in progress flag
+                animationInProgress = true;
+            }
+            
+            return linesCleared;
+        }
+        
+        // Flash animation and then clear the lines
+        function animateClearLines(rows, callback) {
+            if (rows.length === 0) {
+                if (callback) callback();
+                return;
+            }
+            
+            // Create a copy of the original colors for each cell in the rows to clear
+            const originalColors = rows.map(y => {
+                return grid[y].map(value => COLORS[value]);
+            });
+            
+            // Play appropriate clear sound effect based on number of lines cleared
+            let clearSound;
+            
+            if (rows.length >= 4) {
+                // Tetris clear (4 lines) - more impressive sound
+                clearSound = new Audio('data:audio/mp3;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIMKpIE5DSCBTb2Z0d2FyZQBUSVQyAAAABgAAAzIyMzUAVFNTRQAAAA8AAANMYXZmNTcuODMuMTAwAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsQAAADoAIAAAgAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+                clearSound.volume = 0.4;
+            } else if (rows.length >= 2) {
+                // Multiple line clear (2-3 lines)
+                clearSound = new Audio('data:audio/mp3;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIMKpIE5DSCBTb2Z0d2FyZQBUSVQyAAAABgAAAzIyMzUAVFNTRQAAAA8AAANMYXZmNTcuODMuMTAwAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsQAAADoAIAAAgAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+                clearSound.volume = 0.35;
+            } else {
+                // Single line clear
+                clearSound = new Audio('data:audio/mp3;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIMKpIE5DSCBTb2Z0d2FyZQBUSVQyAAAABgAAAzIyMzUAVFNTRQAAAA8AAANMYXZmNTcuODMuMTAwAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsQAAADoAIAAAgAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+                clearSound.volume = 0.3;
+            }
+            
+            clearSound.play();
+            
+            // Choose animation style based on lines cleared
+            if (rows.length >= 4) {
+                // Special animation for Tetris (4 lines)
+                animateTetrisClear(rows, originalColors, callback);
+            } else {
+                // Standard flash animation for 1-3 lines
+                animateRegularClear(rows, originalColors, callback);
+            }
+        }
+        
+        // Regular flash animation for 1-3 line clears
+        function animateRegularClear(rows, originalColors, callback) {
+            // Define flash colors for the animation
+            const flashColors = ['#FFFFFF', '#AAAAAA'];
+            
+            // Number of flashes
+            const numFlashes = 3;
+            const flashDuration = 100;  // milliseconds per flash
+            
+            // Flash animation function
+            let flashCount = 0;
+            
+            function doFlash() {
+                // Get current flash index
+                const flashIndex = flashCount % flashColors.length;
+                
+                // Apply the flash color to all cells in the rows to clear
+                rows.forEach((y, rowIndex) => {
+                    for (let x = 0; x < COLS; x++) {
+                        // Only change color of filled cells
+                        if (grid[y][x] !== 0) {
+                            // Change to flash color during flash
+                            COLORS[grid[y][x]] = flashColors[flashIndex];
+                        }
+                    }
+                });
+                
+                // Force a redraw to show the flash
+                drawGame();
+                
+                flashCount++;
+                
+                // Continue flashing if we haven't reached the limit
+                if (flashCount < numFlashes * flashColors.length) {
+                    setTimeout(doFlash, flashDuration);
+                } else {
+                    // Restore original colors
+                    rows.forEach((y, rowIndex) => {
+                        for (let x = 0; x < COLS; x++) {
+                            if (grid[y][x] !== 0) {
+                                COLORS[grid[y][x]] = originalColors[rowIndex][x];
+                            }
+                        }
+                    });
+                    
+                    // Force a final redraw with original colors
+                    drawGame();
+                    
+                    // Call the callback to finalize the line clearing
+                    setTimeout(callback, 50);
+                }
+            }
+            
+            // Start the flashing animation
+            doFlash();
+        }
+        
+        // Special animation for Tetris (4 lines)
+        function animateTetrisClear(rows, originalColors, callback) {
+            // Special animation for Tetris (4 lines)
+            const flashColors = ['#FFFFFF', '#FFD700', '#FF8C00', '#FF4500'];
+            const flashDuration = 80;  // faster for more dramatic effect
+            const numFlashes = 5;      // more flashes for Tetris
+            
+            // Temporary text notification for Tetris
+            const notification = document.createElement('div');
+            notification.style.position = 'absolute';
+            notification.style.top = '50%';
+            notification.style.left = '50%';
+            notification.style.transform = 'translate(-50%, -50%)';
+            notification.style.padding = '15px';
+            notification.style.background = 'rgba(0, 0, 0, 0.8)';
+            notification.style.color = '#FFD700'; // Gold color
+            notification.style.fontFamily = "'Press Start 2P', cursive";
+            notification.style.fontSize = '20px';
+            notification.style.borderRadius = '10px';
+            notification.style.zIndex = '2000';
+            notification.style.textAlign = 'center';
+            notification.style.boxShadow = '0 0 20px rgba(255, 215, 0, 0.7)';
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.3s ease-in-out';
+            notification.textContent = 'TETRIS!';
+            document.body.appendChild(notification);
+            
+            // Show notification with fade-in
+            setTimeout(() => {
+                notification.style.opacity = '1';
+            }, 50);
+            
+            // Flash animation function
+            let flashCount = 0;
+            
+            function doTetrisFlash() {
+                // Get current flash index
+                const flashIndex = flashCount % flashColors.length;
+                
+                // Apply rainbow flash colors to all cells in the rows to clear
+                rows.forEach((y, rowIndex) => {
+                    for (let x = 0; x < COLS; x++) {
+                        // Only change color of filled cells
+                        if (grid[y][x] !== 0) {
+                            // Change to flash color during flash
+                            COLORS[grid[y][x]] = flashColors[flashIndex];
+                        }
+                    }
+                });
+                
+                // Force a redraw to show the flash
+                drawGame();
+                
+                flashCount++;
+                
+                // Continue flashing if we haven't reached the limit
+                if (flashCount < numFlashes * flashColors.length) {
+                    setTimeout(doTetrisFlash, flashDuration);
+                } else {
+                    // Restore original colors
+                    rows.forEach((y, rowIndex) => {
+                        for (let x = 0; x < COLS; x++) {
+                            if (grid[y][x] !== 0) {
+                                COLORS[grid[y][x]] = originalColors[rowIndex][x];
+                            }
+                        }
+                    });
+                    
+                    // Force a final redraw with original colors
+                    drawGame();
+                    
+                    // Remove notification with fade-out
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 300);
+                    
+                    // Call the callback to finalize the line clearing
+                    setTimeout(callback, 100);
+                }
+            }
+            
+            // Start the flashing animation after a short delay
+            setTimeout(doTetrisFlash, 200);
+        }
+        
+        // Highlight the last placed piece to show its impact
+        function highlightLastPlacement(lastPiecePos, callback) {
+            if (!lastPiecePos) {
+                if (callback) callback();
+                return;
+            }
+            
+            // Create a temporary effect that only applies to the specific cells of the last placed piece
+            // This way it won't affect other pieces of the same type on the board
+            
+            // First, create a list of specific cells that were in the last piece
+            const highlightCells = [];
+            
+            // Add each cell of the piece to the highlight list
+            lastPiecePos.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        highlightCells.push({
+                            x: x + lastPiecePos.x,
+                            y: y + lastPiecePos.y
+                        });
+                    }
+                });
+            });
+            
+            // Add a subtle landing sound
+            const landSound = new Audio('data:audio/mp3;base64,SUQzBAAAAAABEVRYWFgAAAAtAAADY29tbWVudABCaWdTb3VuZEJhbmsuY29tIC8gTGFTb25vdGhlcXVlLm9yZwBURU5DAAAAHQAAA1N3aXRjaCBQbHVzIMKpIE5DSCBTb2Z0d2FyZQBUSVQyAAAABgAAAzIyMzUAVFNTRQAAAA8AAANMYXZmNTcuODMuMTAwAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsQAAADoAIAAAgAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+            landSound.volume = 0.15;
+            landSound.play();
+            
+            // Simple pulsing animation for the piece
+            let pulseCount = 0;
+            const maxPulses = 2;  // Number of highlight pulses
+            const pulseDuration = 80;  // Duration of each pulse in ms
+            
+            // Store original grid copy for restoring after animation
+            const originalGrid = grid.map(row => [...row]);
+            
+            function doPulse() {
+                // Create a copy of the grid for manipulation
+                const tempGrid = originalGrid.map(row => [...row]);
+                
+                // Flash color based on pulse count
+                const useFlashColor = (pulseCount % 2 === 0);
+                const flashColor = useFlashColor ? 8 : lastPiecePos.type; // 8 is a special flash type
+                
+                // Update the specific cells in our temporary copy
+                highlightCells.forEach(cell => {
+                    // Only update if the cell is within bounds and has a block
+                    if (cell.y >= 0 && cell.y < ROWS && cell.x >= 0 && cell.x < COLS) {
+                        // Check if there's a block here in the original grid
+                        if (originalGrid[cell.y][cell.x] === lastPiecePos.type) {
+                            tempGrid[cell.y][cell.x] = flashColor;
+                        }
+                    }
+                });
+                
+                // Before we do the temp colors, let's add a special color for the flash
+                if (useFlashColor) {
+                    COLORS[8] = '#FFFFFF'; // White flash
+                }
+                
+                // Temporarily replace the game grid with our modified version
+                grid.forEach((row, y) => {
+                    row.forEach((_, x) => {
+                        grid[y][x] = tempGrid[y][x];
+                    });
+                });
+                
+                // Force a redraw
+                drawGame();
+                
+                pulseCount++;
+                
+                // Continue until we've done all pulses
+                if (pulseCount < maxPulses * 2) {
+                    setTimeout(doPulse, pulseDuration);
+                } else {
+                    // Restore the original grid
+                    grid.forEach((row, y) => {
+                        row.forEach((_, x) => {
+                            grid[y][x] = originalGrid[y][x];
+                        });
+                    });
+                    
+                    // Force a final redraw
+                    drawGame();
+                    
+                    // Proceed with callback
+                    if (callback) setTimeout(callback, 50);
+                }
+            }
+            
+            // Start the pulse animation
+            doPulse();
+        }
+        
+        // Actually remove the cleared lines after animation
+        function finalizeClearLines(rows) {
+            // Sort rows in descending order to avoid index shifting problems when removing
+            rows.sort((a, b) => b - a);
+            
+            // Remove each row and add a new one at the top
+            rows.forEach(y => {
+                grid.splice(y, 1);
+                grid.unshift(Array(COLS).fill(0));
+            });
+        }
+        
+        // Analyze board state and adapt strategy as needed
+        function analyzeAndAdaptStrategy() {
+            // Skip in learning phase
+            if (learningPhase) return;
+            
+            // Get current board state metrics
+            const heights = getColumnHeights();
+            const horizontalGaps = detectHorizontalGaps(grid, heights);
+            
+            // Calculate board metrics
+            let aggregateHeight = heights.reduce((sum, height) => sum + (ROWS - height), 0);
+            let bumpiness = 0;
+            for (let x = 0; x < COLS - 1; x++) {
+                bumpiness += Math.abs(heights[x] - heights[x + 1]);
+            }
+            
+            // Count holes
+            let holes = 0;
+            for (let x = 0; x < COLS; x++) {
+                let foundBlock = false;
+                for (let y = 0; y < ROWS; y++) {
+                    if (grid[y][x] !== 0) {
+                        foundBlock = true;
+                    } else if (foundBlock) {
+                        holes++;
+                    }
+                }
+            }
+            
+            // Check for horizontal gaps that need filling
+            const hasLargeGaps = horizontalGaps.some(gap => gap.length >= 3);
+            
+            // Average height of all columns
+            const averageHeight = aggregateHeight / COLS;
+            
+            let newStrategy = currentStrategy;
+            
+            // Board is very bumpy - switch to flat stacking to level it
+            if (bumpiness > 15) {
+                newStrategy = AI_STRATEGIES.FLAT_STACK;
+            }
+            // Board has lots of holes - focus on hole avoidance
+            else if (holes > 10) {
+                newStrategy = AI_STRATEGIES.HOLE_AVOID;
+            }
+            // Board is getting tall without many holes - aggressive line clearing
+            else if (averageHeight > 12 && holes < 8) {
+                newStrategy = AI_STRATEGIES.AGGRESSIVE;
+            }
+            // Board has large horizontal gaps - use a strategy to fill them
+            else if (hasLargeGaps) {
+                newStrategy = AI_STRATEGIES.BALANCED;
+            }
+            // Default to using the learned best strategy
+            else {
+                newStrategy = bestStrategy || AI_STRATEGIES.LINE_CLEAR;
+            }
+            
+            // Only update if strategy is changing
+            if (newStrategy !== currentStrategy) {
+                currentStrategy = newStrategy;
+                
+                // Show subtle strategy change notification
+                showStrategyChange(newStrategy);
+            }
+        }
+        
+        // Show a subtle notification when strategy changes
+        function showStrategyChange(strategy) {
+            // Create notification element
+            let notification = document.createElement('div');
+            notification.style.position = 'absolute';
+            notification.style.bottom = '20px';
+            notification.style.left = '50%';
+            notification.style.transform = 'translateX(-50%)';
+            notification.style.padding = '10px 15px';
+            notification.style.background = 'rgba(0, 0, 0, 0.7)';
+            notification.style.color = '#ddd';
+            notification.style.fontFamily = "'Press Start 2P', cursive";
+            notification.style.fontSize = '10px';
+            notification.style.borderRadius = '5px';
+            notification.style.zIndex = '1000';
+            notification.style.textAlign = 'center';
+            notification.style.boxShadow = '0 0 10px rgba(70, 130, 240, 0.5)';
+            
+            // Format strategy name
+            let strategyName = strategy.replace('-', ' ').toUpperCase();
+            notification.textContent = `STRATEGY: ${strategyName}`;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 2 seconds
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 2000);
+        }
+        
+        function updateLinesTotal(linesCleared) {
+            // Update total lines cleared
+            linesTotal += linesCleared;
+            
+            // Track strategy effectiveness
+            strategyStats[currentStrategy].linesCleared += linesCleared;
+        }
+        
+        // Function to determine the most effective strategy
+        function determineBestStrategy() {
+            let maxEfficiency = -1;
+            let mostEffectiveStrategy = null;
+            
+            // Calculate efficiency ratio (lines cleared per piece) for each strategy
+            for (const strategy in strategyStats) {
+                const stats = strategyStats[strategy];
+                
+                // Only consider strategies with enough data
+                if (stats.piecesPlaced >= STRATEGY_CHANGE_INTERVAL) {
+                    const efficiency = stats.piecesPlaced > 0 ? stats.linesCleared / stats.piecesPlaced : 0;
+                    
+                    if (efficiency > maxEfficiency) {
+                        maxEfficiency = efficiency;
+                        mostEffectiveStrategy = strategy;
+                    }
+                }
+            }
+            
+            // Set the best strategy
+            bestStrategy = mostEffectiveStrategy || AI_STRATEGIES.LINE_CLEAR;
+            
+            // Notify about the best strategy
+            showBestStrategyNotification(bestStrategy);
+        }
+        
+        // Function to detect horizontal gaps in the grid
+        function detectHorizontalGaps(grid, columnHeights) {
+            const gaps = [];
+            
+            // Loop through each row of the grid to find horizontal gaps
+            for (let y = 0; y < ROWS; y++) {
+                let gapStartX = -1;
+                let gapLength = 0;
+                
+                // Check for horizontal gaps (empty cells flanked by filled cells)
+                for (let x = 0; x < COLS; x++) {
+                    // If empty cell
+                    if (grid[y][x] === 0) {
+                        // If this is the first empty cell in a potential gap
+                        if (gapStartX === -1) {
+                            gapStartX = x;
+                        }
+                        gapLength++;
+                    } 
+                    // If filled cell or reached the edge
+                    else {
+                        // If we had a gap and it's now closing
+                        if (gapStartX !== -1) {
+                            // Check if there's a filled cell at the start too (true gap)
+                            if (gapStartX > 0 && grid[y][gapStartX - 1] !== 0) {
+                                // Determine priority based on gap length and position
+                                let isPriority = gapLength <= 3; // Small gaps are easier to fill
+                                
+                                // Check if gap has filled cells above it (higher priority)
+                                if (y > 0) {
+                                    let hasFilledCellsAbove = false;
+                                    for (let gx = gapStartX; gx < gapStartX + gapLength; gx++) {
+                                        if (grid[y-1][gx] !== 0) {
+                                            hasFilledCellsAbove = true;
+                                            break;
+                                        }
+                                    }
+                                    if (hasFilledCellsAbove) {
+                                        isPriority = true; // Gaps with cells above are higher priority
+                                    }
+                                }
+                                
+                                gaps.push({
+                                    x: gapStartX,
+                                    y: y,
+                                    length: gapLength,
+                                    isPriority: isPriority
+                                });
+                            }
+                            // Reset gap tracking
+                            gapStartX = -1;
+                            gapLength = 0;
+                        }
+                    }
+                }
+                
+                // Check if gap extends to the edge
+                if (gapStartX !== -1) {
+                    // Only count it if it started with a filled cell
+                    if (gapStartX > 0 && grid[y][gapStartX - 1] !== 0) {
+                        // Edge gaps are higher priority
+                        let isPriority = true;
+                        
+                        // Check if gap has filled cells above it (even higher priority)
+                        if (y > 0) {
+                            let hasFilledCellsAbove = false;
+                            for (let gx = gapStartX; gx < gapStartX + gapLength; gx++) {
+                                if (gx < COLS && grid[y-1][gx] !== 0) {
+                                    hasFilledCellsAbove = true;
+                                    break;
+                                }
+                            }
+                            if (hasFilledCellsAbove) {
+                                // Extreme priority for edge gaps with cells above
+                                isPriority = true;
+                            }
+                        }
+                        
+                        gaps.push({
+                            x: gapStartX,
+                            y: y,
+                            length: gapLength,
+                            isPriority: isPriority
+                        });
+                    }
+                }
+            }
+            
+            // Detect all types of surface irregularities that form gaps
+            for (let y = 0; y < ROWS - 1; y++) {
+                for (let x = 1; x < COLS - 1; x++) {
+                    // Check for U-shaped gaps (classic flat land gaps)
+                    if (columnHeights[x-1] === columnHeights[x+1] && // Same height left and right
+                        columnHeights[x] > columnHeights[x-1] && // Middle column is higher (more empty)
+                        y >= columnHeights[x-1] && y < columnHeights[x]) { // Gap is in the right vertical position
+                        
+                        // Determine depth of the U-shaped gap
+                        const depthOfGap = columnHeights[x] - columnHeights[x-1];
+                        
+                        // Deeper gaps are higher priority (harder to fill later)
+                        const isDeep = depthOfGap >= 2;
+                        
+                        gaps.push({
+                            x: x,
+                            y: y,
+                            length: 1,
+                            isPriority: true, // All flat land gaps are priority
+                            isDeep: isDeep   // Additionally mark deep gaps
+                        });
+                    }
+                    
+                    // Check for "staircases" (adjacent columns with progressively increasing height)
+                    if (x > 1 && columnHeights[x-2] < columnHeights[x-1] && columnHeights[x-1] < columnHeights[x] &&
+                        y >= columnHeights[x-2] && y < columnHeights[x-1]) {
+                        
+                        gaps.push({
+                            x: x-1,
+                            y: y,
+                            length: 1,
+                            isPriority: true, // Staircase gaps are also priority
+                            isStaircase: true
+                        });
+                    }
+                }
+            }
+            
+            // Enhanced detection of wells at all board positions
+            for (let x = 0; x < COLS; x++) {
+                let isWell = false;
+                let wellDepth = 0;
+                
+                // Edge wells
+                if (x === 0 && columnHeights[0] > columnHeights[1]) {
+                    isWell = true;
+                    wellDepth = columnHeights[0] - columnHeights[1];
+                }
+                else if (x === COLS-1 && columnHeights[COLS-1] > columnHeights[COLS-2]) {
+                    isWell = true;
+                    wellDepth = columnHeights[COLS-1] - columnHeights[COLS-2];
+                }
+                // Interior wells
+                else if (x > 0 && x < COLS-1) {
+                    const leftHigher = columnHeights[x-1] > columnHeights[x];
+                    const rightHigher = columnHeights[x+1] > columnHeights[x];
+                    
+                    if (leftHigher && rightHigher) {
+                        isWell = true;
+                        wellDepth = Math.min(columnHeights[x-1], columnHeights[x+1]) - columnHeights[x];
+                    }
+                }
+                
+                // Add gaps for the well if deep enough
+                if (isWell && wellDepth >= 1) {
+                    // Higher priority for deeper wells
+                    const isDeepWell = wellDepth >= 3;
+                    
+                    // Add a gap entry for each cell in the well
+                    const startY = columnHeights[x];
+                    const endY = (x === 0) ? columnHeights[1] : 
+                                (x === COLS-1) ? columnHeights[COLS-2] :
+                                Math.min(columnHeights[x-1], columnHeights[x+1]);
+                    
+                    for (let y = startY; y < endY; y++) {
+                        gaps.push({
+                            x: x,
+                            y: y,
+                            length: 1,
+                            isPriority: true,  // Wells are always high priority
+                            isDeepWell: isDeepWell
+                        });
+                    }
+                }
+            }
+            
+            return gaps;
+        }
+        
+        // This function is still used in some calls, we'll keep it for backward compatibility
+        function checkFillsHorizontalGap(pieceMatrix, column, landingY, horizontalGaps) {
+            const result = checkFillsHorizontalGapWithInfo(pieceMatrix, column, landingY, horizontalGaps);
+            return result.fills;
+        }
+
+        // Enhanced version that returns more info about the gap being filled
+        function checkFillsHorizontalGapWithInfo(pieceMatrix, column, landingY, horizontalGaps) {
+            const pieceWidth = pieceMatrix[0].length;
+            const pieceHeight = pieceMatrix.length;
+            
+            // Track different types of priority gaps
+            let fillsPriorityGap = false;
+            let fillsDeepWell = false;
+            let fillsStaircase = false;
+            let hasFilledCellsAbove = false;
+            
+            // Piece characteristics
+            const isHorizontalPiece = pieceMatrix[0].length > pieceMatrix.length;
+            const isVerticalPiece = pieceMatrix[0].length < pieceMatrix.length;
+            
+            // For each horizontal gap
+            for (const gap of horizontalGaps) {
+                // If the piece is in the same row as a gap
+                if (landingY <= gap.y && landingY + pieceHeight > gap.y) {
+                    // If the piece overlaps with the gap horizontally
+                    if (column <= gap.x + gap.length && column + pieceWidth > gap.x) {
+                        // Calculate how much of the gap this piece fills
+                        const gapFillingAmount = Math.min(gap.x + gap.length, column + pieceWidth) - 
+                                               Math.max(gap.x, column);
+                        
+                        // Piece covers a significant portion of the gap
+                        if (gapFillingAmount > 0) {
+                            // Track special types of gaps
+                            if (gap.isPriority) {
+                                fillsPriorityGap = true;
+                                
+                                // Check for deep wells (higher priority)
+                                if (gap.isDeepWell) {
+                                    fillsDeepWell = true;
+                                }
+                                
+                                // Check for staircase gaps
+                                if (gap.isStaircase) {
+                                    fillsStaircase = true;
+                                }
+                                
+                                // Deep wells are better filled with vertical pieces
+                                if (gap.isDeepWell && isVerticalPiece) {
+                                    return { 
+                                        fills: true, 
+                                        isPriority: true, 
+                                        isDeepWell: true,
+                                        isVerticalFill: true
+                                    };
+                                }
+                                
+                                // Small gaps are better filled with horizontal pieces
+                                if (gap.length <= 3 && isHorizontalPiece) {
+                                    return { 
+                                        fills: true, 
+                                        isPriority: true, 
+                                        isHorizontalFill: true 
+                                    };
+                                }
+                            } else {
+                                // For regular gaps, still return right away
+                                return { fills: true, isPriority: false };
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Return the most important gap fill type if any were found
+            if (fillsDeepWell) {
+                return { 
+                    fills: true, 
+                    isPriority: true, 
+                    isDeepWell: true 
+                };
+            } else if (fillsStaircase) {
+                return { 
+                    fills: true, 
+                    isPriority: true, 
+                    isStaircase: true 
+                };
+            } else if (fillsPriorityGap) {
+                return { 
+                    fills: true, 
+                    isPriority: true 
+                };
+            }
+            
+            return { fills: false, isPriority: false };
+        }
+        
+        function showBestStrategyNotification(strategy) {
+            // Create notification element
+            let notification = document.createElement('div');
+            notification.style.position = 'absolute';
+            notification.style.top = '50%';
+            notification.style.left = '50%';
+            notification.style.transform = 'translate(-50%, -50%)';
+            notification.style.padding = '20px';
+            notification.style.background = 'rgba(0, 0, 0, 0.9)';
+            notification.style.color = '#fff';
+            notification.style.fontFamily = "'Press Start 2P', cursive";
+            notification.style.fontSize = '16px';
+            notification.style.borderRadius = '10px';
+            notification.style.zIndex = '2000';
+            notification.style.textAlign = 'center';
+            notification.style.boxShadow = '0 0 20px rgba(0, 112, 255, 0.7)';
+            
+            // Format strategy name
+            let strategyName = strategy.replace('-', ' ').toUpperCase();
+            notification.innerHTML = `<p style="margin-bottom:15px;color:#70a1ff;font-size:20px;">AI LEARNING COMPLETE</p>
+                                    <p>Best Strategy:<br>${strategyName}</p>`;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 5000);
+        }
+        
+        function showGameOver() {
+            document.getElementById('game-over').style.display = 'block';
+            document.getElementById('final-lines').textContent = linesTotal;
+            
+            // Clear auto-play timers
+            clearInterval(moveDownTimer);
+            clearInterval(rotateTimer);
+            clearInterval(moveLeftRightTimer);
+            clearInterval(aiThinkTimer);
+            clearInterval(adaptiveStrategyTimer);
+            
+            // Set up countdown for restart
+            let countdown = 3;
+            const countdownElement = document.getElementById('restart-countdown');
+            
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                countdownElement.textContent = `Restarting in ${countdown} seconds...`;
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    init(); // Restart the game
+                }
+            }, 1000);
+        }
+        
+        // Start the game when the page loads
+        window.addEventListener('load', setup);
+    </script>
+</body>
+</html>
