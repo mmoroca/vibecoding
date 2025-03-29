@@ -6,9 +6,13 @@ TODO:
 - Make the clock work as expected.
 - Make the AI move within the level time limits.
 
+![one file chess](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-chess.jpeg)
+
 onefile-blocks
 ==============
 A Tetris clone. Features all the expected functionality with panels like score, next piece and controls and a graphical theme selction (original, gameboy, nes, 16bit and terminal). It keeps the highscore locally and is responsive with specific touch controls.
 
 TODO:
 - Change touch controls to an screen sections one on the playing zone (upper to roll, left and right ones to move left or right, down to drop).
+
+![one file blocks](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-blocks.jpeg)
