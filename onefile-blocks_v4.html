@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro Blocks</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Default theme (original) colors, will be updated by theme selector */
+            --blocks-dark: #0f380f;
+            --blocks-medium: #306230;
+            --blocks-light: #8bac0f;
+            --blocks-pale: #9bbc0f;
+            --blocks-accent: #e6f8da;
+            --blocks-border: #8bac0f;
+            --blocks-i: #00ffff;
+            --blocks-o: #ffff00;
+            --blocks-t: #800080;
+            --blocks-s: #00ff00;
+            --blocks-z: #ff0000;
+            --blocks-j: #0000ff;
+            --blocks-l: #ff7f00;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden; /* Prevent scrolling when pressing up/down keys */
+        }
+        
+        body {
+            background-color: #000;
+            color: var(--blocks-pale);
+            font-family: 'Press Start 2P', cursive;
+            text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            display: block;
+        }
+        
+        .max-w-5xl {
+            max-width: 64rem;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        .pixel-border {
+            box-shadow: 
+                0 0 0 2px var(--blocks-pale),
+                0 0 0 4px var(--blocks-dark);
+            background-color: var(--blocks-dark);
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .game-title {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .game-title h1 {
+            color: var(--blocks-pale);
+            font-size: 1.5rem;
+            font-weight: normal;
+            letter-spacing: 0.1em;
+        }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .game-board-container {
+            position: relative;
+            width: fit-content;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #gameBoard {
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .game-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            width: 100%;
+        }
+        
+        /* Flex container for controls in a row */
+        .controls-flex {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .mobile-theme-select {
+            flex: 0 0 auto;
+        }
+        
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            width: 100%;
+            max-width: 16rem;
+            position: relative;
+        }
+        
+        .panel-section {
+            background-color: var(--blocks-dark);
+            padding: 0.5rem;
+        }
+        
+        .panel-section h2 {
+            font-size: 0.875rem;
+            color: var(--blocks-pale);
+            margin-bottom: 0.25rem;
+        }
+        
+        .panel-content {
+            background-color: var(--blocks-medium);
+            padding: 0.5rem;
+        }
+        
+        .panel-value {
+            font-size: 1.125rem;
+            text-align: right;
+            color: var(--blocks-pale);
+        }
+        
+        /* Compact Score Panel for Mobile */
+        .panel-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            width: 100%;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--blocks-medium);
+            padding: 0.25rem 0.5rem;
+        }
+        
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--blocks-pale);
+        }
+        
+        .controls-list {
+            font-size: 0.75rem;
+            color: var(--blocks-light);
+            list-style-type: none;
+            padding-left: 0.5rem;
+        }
+        
+        .controls-list li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .button {
+            background-color: var(--blocks-medium);
+            color: var(--blocks-pale);
+            border: 2px solid var(--blocks-pale);
+            font-family: 'Press Start 2P', cursive;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .button:hover {
+            background-color: var(--blocks-light);
+        }
+        
+        .start-button {
+            padding: 0.75rem 1.5rem;
+        }
+        
+        .sound-toggle {
+            font-size: 1.5rem;
+            color: var(--blocks-light);
+            background: none;
+            border: none;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            line-height: 1;
+        }
+        
+        #soundIcon {
+            display: block;
+        }
+        
+        .mobile-gesture-info {
+            font-size: 0.7rem;
+            color: var(--blocks-light);
+            text-align: center;
+            background-color: var(--blocks-medium);
+            padding: 0.5rem;
+            border: 1px solid var(--blocks-pale);
+            margin: 0.5rem 0;
+            display: none;
+        }
+        
+        .empty-cell {
+            /* Empty grid cell */
+        }
+        
+        .game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50; /* Make sure it's above everything */
+        }
+        
+        .game-over-content {
+            text-align: center;
+        }
+        
+        .game-over-title {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--blocks-pale);
+        }
+        
+        .final-score,
+        .high-score {
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            color: var(--blocks-light);
+        }
+        
+        .score-compare {
+            font-size: 0.75rem;
+            margin-bottom: 1rem;
+            color: var(--blocks-accent);
+            min-height: 1rem;
+        }
+        
+        .screen-flicker {
+            animation: flicker 8s infinite;
+        }
+        
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            99.9% { opacity: 1; }
+            99.95% { opacity: 0.8; }
+        }
+        
+        .blink {
+            animation: blink-animation 1s steps(2, start) infinite;
+        }
+        
+        @keyframes blink-animation {
+            to { visibility: hidden; }
+        }
+        
+        .controls-guide {
+            display: none; /* Initially hidden, shown based on screen size */
+            flex-grow: 1;  /* Take up remaining space to match height */
+        }
+        
+        /* Responsive Styles */
+        @media (min-width: 768px) {
+            body {
+                padding: 2rem;
+            }
+            
+            .game-title h1 {
+                font-size: 2.25rem;
+            }
+            
+            .game-container {
+                flex-direction: row;
+                align-items: flex-start;
+                gap: 2rem;
+                justify-content: center;
+            }
+            
+            .left-column {
+                width: auto;
+            }
+            
+            .side-panel {
+                height: 450px; /* Match the game board height on desktop */
+            }
+            
+            .mobile-controls {
+                display: none;
+            }
+            
+            .controls-guide {
+                display: block;
+            }
+        }
+        
+        /* Touch-friendly mobile adjustments */
+        @media (max-width: 767px) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .game-title h1 {
+                font-size: 1.25rem;
+                margin-bottom: 0.5rem;
+            }
+            
+            .game-container {
+                gap: 0.5rem;
+            }
+            
+            .game-board-container {
+                margin-bottom: 0;
+            }
+            
+            .game-controls {
+                margin: 0.5rem 0;
+            }
+            
+            /* Hide the desktop theme selector on mobile */
+            .theme-selector {
+                display: none;
+            }
+            
+            /* Show start button in a prominent position on mobile */
+            #startButton {
+                display: flex;
+                font-size: 1.2rem;
+                padding: 0.5rem;
+                width: auto;
+                justify-content: center;
+                margin-top: 0;
+                background-color: var(--blocks-medium);
+                color: var(--blocks-light);
+                border: 3px solid var(--blocks-light);
+                flex-direction: column;
+                line-height: 1.2;
+                text-align: center;
+            }
+            
+            /* Hide mobile gesture info, showing overlay instead */
+            .mobile-gesture-info {
+                display: none;
+            }
+            
+            /* Make the score panel compact horizontal row for mobile */
+            .score-panel {
+                margin-bottom: 0.5rem;
+            }
+            
+            .panel-stats {
+                flex-direction: row;
+                gap: 0.25rem;
+                justify-content: space-between;
+            }
+            
+            .stat-item {
+                flex: 1;
+                padding: 0.2rem 0.4rem;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            
+            .stat-label {
+                margin-bottom: 0.2rem;
+            }
+            
+            .panel-value {
+                font-size: 0.9rem;
+                text-align: center;
+            }
+            
+            /* Make the next piece preview more compact */
+            .pixel-border h2 {
+                margin-bottom: 0.25rem !important;
+            }
+            
+            #nextPiece {
+                height: 80px;
+            }
+            
+            /* Hide mobile controls completely on mobile */
+            .mobile-controls {
+                display: none;
+            }
+        }
+        
+        /* Welcome Screen Styles */
+        .welcome-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--blocks-dark);
+            z-index: 2000;
+            display: flex; /* Visible by default on load */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        
+        .welcome-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .welcome-title {
+            font-size: 2rem;
+            color: var(--blocks-accent);
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+            letter-spacing: 2px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .mascot {
+            margin: 1rem 0;
+        }
+        
+        .ascii-art {
+            font-family: monospace;
+            color: var(--blocks-accent);
+            font-size: 10px;
+            line-height: 1.2;
+            text-align: center;
+            white-space: pre;
+        }
+        
+        .welcome-message {
+            font-size: 1rem;
+            color: var(--blocks-light);
+            margin: 1rem 0;
+        }
+        
+        .tap-to-start {
+            font-size: 0.8rem;
+            color: var(--blocks-light);
+            margin-top: 2rem;
+            animation: blink 1s infinite;
+        }
+        
+        /* Gesture Overlay Styles */
+        .gesture-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 56, 15, 0.9);
+            z-index: 1000;
+            display: none; /* Initially hidden, shown when game starts */
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(3px);
+        }
+
+        .overlay-content {
+            background-color: var(--blocks-dark);
+            color: var(--blocks-light);
+            border: 4px solid var(--blocks-light);
+            padding: 20px;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        .gesture-instructions {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .gesture-instructions p {
+            margin: 10px 0;
+            font-size: 0.9rem;
+        }
+
+        .gesture-instructions span {
+            display: inline-block;
+            width: 25px;
+            height: 25px;
+            line-height: 25px;
+            text-align: center;
+            background-color: var(--blocks-light);
+            color: var(--blocks-dark);
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .tap-to-close {
+            font-size: 0.8rem;
+            margin-top: 20px;
+            color: var(--blocks-pale);
+        }
+        
+        /* Theme Selector Styles */
+        .theme-select {
+            width: 100%;
+            padding: 0.3rem;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.7rem;
+            background-color: var(--blocks-dark);
+            color: var(--blocks-light);
+            border: 2px solid var(--blocks-light);
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .theme-select option {
+            background-color: var(--blocks-dark);
+            color: var(--blocks-light);
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="max-w-5xl screen-flicker">
+        <!-- Game Title -->
+        <div class="game-title">
+            <h1>RETRO BLOCKS</h1>
+        </div>
+        
+        <div class="game-container">
+            <!-- Left Column: Game Area + Game Controls -->
+            <div class="left-column">
+                <!-- Game Board -->
+                <div class="pixel-border game-board-container">
+                    <canvas id="gameBoard" width="240" height="400"></canvas>
+                    
+                    <!-- Game Over Screen (Initially Hidden) -->
+                    <div id="gameOverScreen" class="game-over-screen">
+                        <div class="game-over-content">
+                            <h2 class="game-over-title blink">GAME OVER</h2>
+                            <p class="final-score">FINAL SCORE: <span id="finalScore">0</span></p>
+                            <p class="high-score">HIGH SCORE: <span id="highScoreValue">0</span></p>
+                            <div id="scoreCompare" class="score-compare"></div>
+                            <button id="restartButton" class="button">RESTART</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Game Controls -->
+                <div class="game-controls">
+                    <div class="controls-flex">
+                        <!-- Start Button with line break for mobile -->
+                        <button id="startButton" class="button start-button">START<br>GAME</button>
+                        
+                        <!-- Sound Toggle -->
+                        <button id="soundToggle" class="sound-toggle">
+                            <span id="soundIcon">🔊</span>
+                        </button>
+
+                        <!-- Mobile Theme selector -->
+                        <div class="mobile-theme-select">
+                            <select id="mobileThemeSelect" class="theme-select">
+                                <option value="original">Original</option>
+                                <option value="gameboy">Game Boy</option>
+                                <option value="nes">NES</option>
+                                <option value="16bit">16-bit</option>
+                                <option value="terminal">Terminal</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Welcome Screen (shown on startup) -->
+                <div id="welcomeScreen" class="welcome-screen">
+                    <div class="welcome-content">
+                        <h1 class="welcome-title">GET READY FOR</h1>
+                        <div class="mascot">
+                            <pre class="ascii-art">
+ .----------------.  .----------------.  .----------------.  .----------------.  .----------------.  .----------------. 
+| .--------------. || .--------------. || .--------------. || .--------------. || .--------------. || .--------------. |
+| |  _______     | || |  _________   | || |  _________   | || |  _______     | || |     ____     | || |      __      | |
+| | |_   __ \    | || | |_   ___  |  | || | |  _   _  |  | || | |_   __ \    | || |   .'    `.   | || |     |  |     | |
+| |   | |__) |   | || |   | |_  \_|  | || | |_/ | | \_|  | || |   | |__) |   | || |  /  .--.  \  | || |  ___|  |___  | |
+| |   |  __ /    | || |   |  _|  _   | || |     | |      | || |   |  __ /    | || |  | |    | |  | || | |          | | |
+| |  _| |  \ \_  | || |  _| |___/ |  | || |    _| |_     | || |  _| |  \ \_  | || |  \  `--'  /  | || |  ----------  | |
+| | |____| |___| | || | |_________|  | || |   |_____|    | || | |____| |___| | || |   `.____.'   | || |              | |
+| |              | || |              | || |              | || |              | || |              | || |              | |
+| '--------------' || '--------------' || '--------------' || '--------------' || '--------------' || '--------------' |
+ '----------------'  '----------------'  '----------------'  '----------------'  '----------------'  '----------------' 
+ .----------------.  .----------------.  .----------------.  .----------------.  .----------------.  .----------------. 
+| .--------------. || .--------------. || .--------------. || .--------------. || .--------------. || .--------------. |
+| |   ______     | || |   _____      | || |     ____     | || |     ______   | || |  ___  ____   | || |    _______   | |
+| |  |_   _ \    | || |  |_   _|     | || |   .'    `.   | || |   .' ___  |  | || | |_  ||_  _|  | || |   /  ___  |  | |
+| |    | |_) |   | || |    | |       | || |  /  .--.  \  | || |  / .'   \_|  | || |   | |_/ /    | || |  |  (__ \_|  | |
+| |    |  __'.   | || |    | |   _   | || |  | |    | |  | || |  | |         | || |   |  __'.    | || |   '.___`-.   | |
+| |   _| |__) |  | || |   _| |__/ |  | || |  \  `--'  /  | || |  \ `.___.'\  | || |  _| |  \ \_  | || |  |`\____) |  | |
+| |  |_______/   | || |  |________|  | || |   `.____.'   | || |   `._____.'  | || | |____||____| | || |  |_______.'  | |
+| |              | || |              | || |              | || |              | || |              | || |              | |
+| '--------------' || '--------------' || '--------------' || '--------------' || '--------------' || '--------------' |
+ '----------------'  '----------------'  '----------------'  '----------------'  '----------------'  '----------------' 
+                            </pre>
+                        </div>
+                        <p class="welcome-message">STACK BLOCKS TO CLEAR ROWS</p>
+                        <p class="tap-to-start">Press any key or tap to start</p>
+                    </div>
+                </div>
+                                
+                <!-- Overlay for Mobile Gesture Instructions (hidden initially) -->
+                <div id="gestureOverlay" class="gesture-overlay">
+                    <div class="overlay-content">
+                        <h3>TOUCH CONTROLS</h3>
+                        <div class="gesture-instructions">
+                            <p><span>↑</span> Swipe Up: Rotate</p>
+                            <p><span>&lt;&gt;</span> Swipe Left/Right: Move</p>
+                            <p><span>↓</span> Swipe Down: Hard Drop</p>
+                            <p><span>•</span> Tap: Soft Drop</p>
+                        </div>
+                        <p class="tap-to-close">Tap anywhere to close</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Side Panel (Score, Next, etc.) -->
+            <div class="side-panel">
+                <!-- Score Panel (Compact Layout) -->
+                <div class="pixel-border score-panel">
+                    <div class="panel-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">SCORE:</span>
+                            <span id="scoreValue" class="panel-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">LVL:</span>
+                            <span id="levelValue" class="panel-value">1</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">LINES:</span>
+                            <span id="linesValue" class="panel-value">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Next Piece Preview -->
+                <div class="pixel-border">
+                    <h2 style="font-size: 0.875rem; margin-bottom: 0.5rem;">NEXT</h2>
+                    <canvas id="nextPiece" width="100" height="100"></canvas>
+                </div>
+                
+                <!-- Controls Guide (hidden on mobile) -->
+                <div class="pixel-border controls-guide">
+                    <h2 style="font-size: 0.875rem; margin-bottom: 0.5rem;">CONTROLS</h2>
+                    <ul class="controls-list">
+                        <li>↑ : ROTATE</li>
+                        <li>&lt; &gt; : MOVE</li>
+                        <li>↓ : SOFT DROP</li>
+                        <li>SPACE : HARD DROP</li>
+                        <li>P : PAUSE</li>
+                    </ul>
+                </div>
+                
+                <!-- Original theme selector removed - now using the one in the game controls -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // Game Constants
+            const COLS = 10;
+            const ROWS = 20;
+            const BLOCK_SIZE = 20;
+            
+            // Color Themes
+            const THEMES = {
+                'original': {
+                    name: 'Original',
+                    background: '#0f380f',
+                    gridLines: 'rgba(155, 188, 15, 0.1)',
+                    border: '#8bac0f',
+                    text: '#9bbc0f',
+                    textHighlight: '#e6f8da',
+                    textShadow: '#0f380f',
+                    buttonBg: '#306230',
+                    buttonHighlight: '#8bac0f',
+                    colors: {
+                        'I': '#00ffff',  // Cyan
+                        'O': '#ffff00',  // Yellow
+                        'T': '#800080',  // Purple
+                        'S': '#00ff00',  // Green
+                        'Z': '#ff0000',  // Red
+                        'J': '#0000ff',  // Blue
+                        'L': '#ff7f00'   // Orange
+                    }
+                },
+                'gameboy': {
+                    name: 'Game Boy',
+                    background: '#0f380f',
+                    gridLines: 'rgba(155, 188, 15, 0.1)',
+                    border: '#8bac0f',
+                    text: '#9bbc0f',
+                    textHighlight: '#e6f8da',
+                    textShadow: '#0f380f',
+                    buttonBg: '#306230',
+                    buttonHighlight: '#8bac0f',
+                    colors: {
+                        'I': '#9bbc0f',  // Light green
+                        'O': '#9bbc0f',  // Light green
+                        'T': '#9bbc0f',  // Light green
+                        'S': '#9bbc0f',  // Light green
+                        'Z': '#9bbc0f',  // Light green
+                        'J': '#9bbc0f',  // Light green
+                        'L': '#9bbc0f'   // Light green
+                    }
+                },
+                'nes': {
+                    name: 'NES',
+                    background: '#000000',
+                    gridLines: 'rgba(100, 100, 100, 0.1)',
+                    border: '#ffffff',
+                    text: '#ffffff',
+                    textHighlight: '#fc7e00',
+                    textShadow: '#000000',
+                    buttonBg: '#d82800',
+                    buttonHighlight: '#fc7e00',
+                    colors: {
+                        'I': '#fc7e00',  // Orange
+                        'O': '#fce800',  // Yellow
+                        'T': '#a428fc',  // Purple
+                        'S': '#00e8d8',  // Cyan
+                        'Z': '#d82800',  // Red
+                        'J': '#0078f8',  // Blue
+                        'L': '#00a800'   // Green
+                    }
+                },
+                '16bit': {
+                    name: '16-bit',
+                    background: '#2d0f6c',
+                    gridLines: 'rgba(170, 170, 255, 0.1)',
+                    border: '#aa90e8',
+                    text: '#c8bfe7',
+                    textHighlight: '#ffffff',
+                    textShadow: '#000000',
+                    buttonBg: '#aa559b',
+                    buttonHighlight: '#ff80ef',
+                    colors: {
+                        'I': '#55aaff',  // Bright blue
+                        'O': '#ffee53',  // Bright yellow
+                        'T': '#ff55ff',  // Bright magenta
+                        'S': '#55ff55',  // Bright green
+                        'Z': '#ff5555',  // Bright red
+                        'J': '#5555ff',  // Royal blue
+                        'L': '#ff9955'   // Bright orange
+                    }
+                },
+                'terminal': {
+                    name: 'Terminal',
+                    background: '#001100',
+                    gridLines: 'rgba(0, 170, 0, 0.1)',
+                    border: '#00aa00',
+                    text: '#00aa00',
+                    textHighlight: '#00ff00',
+                    textShadow: '#000000',
+                    buttonBg: '#005500',
+                    buttonHighlight: '#00dd00',
+                    colors: {
+                        'I': '#00aa00',  // Green
+                        'O': '#00aa00',  // Green
+                        'T': '#00aa00',  // Green
+                        'S': '#00aa00',  // Green
+                        'Z': '#00aa00',  // Green
+                        'J': '#00aa00',  // Green
+                        'L': '#00aa00'   // Green
+                    }
+                }
+            };
+            
+            // Current theme (default: original)
+            let currentTheme = 'original';
+            let COLORS = THEMES[currentTheme].colors;
+            
+            // Game Variables
+            let board = createEmptyBoard();
+            let currentPiece = null;
+            let nextPiece = null;
+            let gameStarted = false;
+            let gameOver = false;
+            let score = 0;
+            let highScore = localStorage.getItem('blocksHighScore') ? parseInt(localStorage.getItem('blocksHighScore')) : 0;
+            let level = 1;
+            let lines = 0;
+            let dropCounter = 0;
+            let dropInterval = 1000; // ms
+            let lastTime = 0;
+            let paused = false;
+            let soundEnabled = true;
+            
+            // DOM Elements
+            const gameCanvas = document.getElementById('gameBoard');
+            const gameCtx = gameCanvas.getContext('2d');
+            const nextCanvas = document.getElementById('nextPiece');
+            const nextCtx = nextCanvas.getContext('2d');
+            const startButton = document.getElementById('startButton');
+            const gameOverScreen = document.getElementById('gameOverScreen');
+            const scoreValue = document.getElementById('scoreValue');
+            const levelValue = document.getElementById('levelValue');
+            const linesValue = document.getElementById('linesValue');
+            const finalScore = document.getElementById('finalScore');
+            const restartButton = document.getElementById('restartButton');
+            const soundToggle = document.getElementById('soundToggle');
+            const gestureOverlay = document.getElementById('gestureOverlay');
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            
+            // Variables for touch gestures
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchEndX = 0;
+            let touchEndY = 0;
+            
+            // Controls display based on screen size
+            const controlsGuide = document.querySelector('.pixel-border:nth-child(3)');
+            if (window.innerWidth >= 768) {
+                controlsGuide.style.display = 'block';
+            }
+            
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 768) {
+                    controlsGuide.style.display = 'block';
+                } else {
+                    controlsGuide.style.display = 'none';
+                }
+            });
+            
+            // Tetrominoes
+            const TETROMINOES = {
+                'I': [
+                    [0, 0, 0, 0],
+                    [1, 1, 1, 1],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0]
+                ],
+                'O': [
+                    [1, 1],
+                    [1, 1]
+                ],
+                'T': [
+                    [0, 1, 0],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ],
+                'S': [
+                    [0, 1, 1],
+                    [1, 1, 0],
+                    [0, 0, 0]
+                ],
+                'Z': [
+                    [1, 1, 0],
+                    [0, 1, 1],
+                    [0, 0, 0]
+                ],
+                'J': [
+                    [1, 0, 0],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ],
+                'L': [
+                    [0, 0, 1],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ]
+            };
+            
+            // Sound Effects
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            function createSound(type, freq = 440, duration = 0.1) {
+                if (!soundEnabled) return;
+                
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.type = type;
+                oscillator.frequency.value = freq;
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+                
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + duration);
+            }
+            
+            // Game Functions
+            function createEmptyBoard() {
+                return Array.from({length: ROWS}, () => Array(COLS).fill(0));
+            }
+            
+            function drawBlock(ctx, x, y, color) {
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+                
+                // Light edge (top and left)
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.fillRect(x, y, BLOCK_SIZE - 1, 2);
+                ctx.fillRect(x, y, 2, BLOCK_SIZE - 1);
+                
+                // Dark edge (bottom and right)
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(x + BLOCK_SIZE - 3, y, 2, BLOCK_SIZE - 1);
+                ctx.fillRect(x, y + BLOCK_SIZE - 3, BLOCK_SIZE - 1, 2);
+            }
+            
+            function drawBoard() {
+                // Calculate centering offset
+                const boardWidthPx = COLS * BLOCK_SIZE;
+                const boardHeightPx = ROWS * BLOCK_SIZE;
+                const offsetX = (gameCanvas.width - boardWidthPx) / 2;
+                const offsetY = (gameCanvas.height - boardHeightPx) / 2;
+                
+                // Clear the canvas with current theme background
+                gameCtx.fillStyle = THEMES[currentTheme].background;
+                gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+                
+                // Draw the grid with current theme grid lines
+                gameCtx.strokeStyle = THEMES[currentTheme].gridLines;
+                for (let i = 0; i < COLS; i++) {
+                    for (let j = 0; j < ROWS; j++) {
+                        gameCtx.strokeRect(
+                            offsetX + i * BLOCK_SIZE, 
+                            offsetY + j * BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            BLOCK_SIZE
+                        );
+                    }
+                }
+                
+                // Draw the pieces on the board
+                for (let y = 0; y < ROWS; y++) {
+                    for (let x = 0; x < COLS; x++) {
+                        if (board[y][x]) {
+                            drawBlock(
+                                gameCtx, 
+                                offsetX + x * BLOCK_SIZE, 
+                                offsetY + y * BLOCK_SIZE, 
+                                board[y][x]
+                            );
+                        }
+                    }
+                }
+                
+                // Draw current piece
+                if (currentPiece) {
+                    for (let y = 0; y < currentPiece.matrix.length; y++) {
+                        for (let x = 0; x < currentPiece.matrix[y].length; x++) {
+                            if (currentPiece.matrix[y][x]) {
+                                drawBlock(
+                                    gameCtx,
+                                    offsetX + (currentPiece.x + x) * BLOCK_SIZE,
+                                    offsetY + (currentPiece.y + y) * BLOCK_SIZE,
+                                    COLORS[currentPiece.type]
+                                );
+                            }
+                        }
+                    }
+                    
+                    // Draw ghost piece (where the piece will land)
+                    let ghostY = currentPiece.y;
+                    while (!checkCollision(currentPiece.matrix, currentPiece.x, ghostY + 1)) {
+                        ghostY++;
+                    }
+                    
+                    gameCtx.globalAlpha = 0.3; // Make ghost piece transparent
+                    for (let y = 0; y < currentPiece.matrix.length; y++) {
+                        for (let x = 0; x < currentPiece.matrix[y].length; x++) {
+                            if (currentPiece.matrix[y][x]) {
+                                drawBlock(
+                                    gameCtx,
+                                    offsetX + (currentPiece.x + x) * BLOCK_SIZE,
+                                    offsetY + (ghostY + y) * BLOCK_SIZE,
+                                    COLORS[currentPiece.type]
+                                );
+                            }
+                        }
+                    }
+                    gameCtx.globalAlpha = 1; // Reset transparency
+                }
+            }
+            
+            function drawNextPiece() {
+                // Clear the canvas with current theme
+                nextCtx.fillStyle = THEMES[currentTheme].background;
+                nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+                
+                if (nextPiece) {
+                    // Center the piece in the canvas
+                    const offsetX = (nextCanvas.width - nextPiece.matrix[0].length * BLOCK_SIZE) / 2;
+                    const offsetY = (nextCanvas.height - nextPiece.matrix.length * BLOCK_SIZE) / 2;
+                    
+                    for (let y = 0; y < nextPiece.matrix.length; y++) {
+                        for (let x = 0; x < nextPiece.matrix[y].length; x++) {
+                            if (nextPiece.matrix[y][x]) {
+                                drawBlock(
+                                    nextCtx,
+                                    offsetX + x * BLOCK_SIZE,
+                                    offsetY + y * BLOCK_SIZE,
+                                    COLORS[nextPiece.type]
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            
+            function getRandomPiece() {
+                const types = Object.keys(TETROMINOES);
+                const type = types[Math.floor(Math.random() * types.length)];
+                return {
+                    matrix: TETROMINOES[type],
+                    x: Math.floor(COLS / 2) - Math.floor(TETROMINOES[type][0].length / 2),
+                    y: 0,
+                    type: type
+                };
+            }
+            
+            function checkCollision(matrix, x, y) {
+                for (let row = 0; row < matrix.length; row++) {
+                    for (let col = 0; col < matrix[row].length; col++) {
+                        if (matrix[row][col] && 
+                            (board[y + row] === undefined || 
+                             board[y + row][x + col] === undefined || 
+                             board[y + row][x + col])) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            
+            function rotatePiece(matrix) {
+                const N = matrix.length;
+                const result = Array.from({length: N}, () => Array(N).fill(0));
+                
+                // Rotate 90 degrees clockwise
+                for (let i = 0; i < N; i++) {
+                    for (let j = 0; j < N; j++) {
+                        result[j][N - 1 - i] = matrix[i][j];
+                    }
+                }
+                
+                return result;
+            }
+            
+            function rotate() {
+                if (!currentPiece || paused || gameOver) return;
+                
+                const originalMatrix = currentPiece.matrix;
+                currentPiece.matrix = rotatePiece(currentPiece.matrix);
+                
+                // Wall kick - if rotation causes collision, try to adjust position
+                if (checkCollision(currentPiece.matrix, currentPiece.x, currentPiece.y)) {
+                    // Try to move right
+                    if (!checkCollision(currentPiece.matrix, currentPiece.x + 1, currentPiece.y)) {
+                        currentPiece.x++;
+                    }
+                    // Try to move left
+                    else if (!checkCollision(currentPiece.matrix, currentPiece.x - 1, currentPiece.y)) {
+                        currentPiece.x--;
+                    }
+                    // Try to move up (for I piece mainly)
+                    else if (!checkCollision(currentPiece.matrix, currentPiece.x, currentPiece.y - 1)) {
+                        currentPiece.y--;
+                    }
+                    // Can't rotate after all, restore the original matrix
+                    else {
+                        currentPiece.matrix = originalMatrix;
+                        return;
+                    }
+                }
+                
+                createSound('square', 220, 0.05);
+            }
+            
+            function moveLeft() {
+                if (!currentPiece || paused || gameOver) return;
+                
+                currentPiece.x--;
+                if (checkCollision(currentPiece.matrix, currentPiece.x, currentPiece.y)) {
+                    currentPiece.x++; // Move back if collision
+                } else {
+                    createSound('square', 120, 0.03);
+                }
+            }
+            
+            function moveRight() {
+                if (!currentPiece || paused || gameOver) return;
+                
+                currentPiece.x++;
+                if (checkCollision(currentPiece.matrix, currentPiece.x, currentPiece.y)) {
+                    currentPiece.x--; // Move back if collision
+                } else {
+                    createSound('square', 130, 0.03);
+                }
+            }
+            
+            function moveDown() {
+                if (!currentPiece || paused || gameOver) return;
+                
+                currentPiece.y++;
+                if (checkCollision(currentPiece.matrix, currentPiece.x, currentPiece.y)) {
+                    currentPiece.y--; // Move back if collision
+                    lockPiece();
+                    clearLines();
+                    spawnPiece();
+                }
+            }
+            
+            function hardDrop() {
+                if (!currentPiece || paused || gameOver) return;
+                
+                // Move piece down until it collides
+                while (!checkCollision(currentPiece.matrix, currentPiece.x, currentPiece.y + 1)) {
+                    currentPiece.y++;
+                    score += 1; // Score bonus for hard drop
+                }
+                
+                createSound('sawtooth', 160, 0.1);
+                
+                lockPiece();
+                clearLines();
+                spawnPiece();
+                updateScore();
+            }
+            
+            function lockPiece() {
+                for (let y = 0; y < currentPiece.matrix.length; y++) {
+                    for (let x = 0; x < currentPiece.matrix[y].length; x++) {
+                        if (currentPiece.matrix[y][x]) {
+                            if (currentPiece.y + y < 0) {
+                                // Game Over - piece locked above the visible area
+                                gameOver = true;
+                                showGameOver();
+                                return;
+                            }
+                            board[currentPiece.y + y][currentPiece.x + x] = COLORS[currentPiece.type];
+                        }
+                    }
+                }
+                
+                createSound('sine', 180, 0.07);
+            }
+            
+            function clearLines() {
+                let linesCleared = 0;
+                
+                for (let y = ROWS - 1; y >= 0; y--) {
+                    let lineIsFull = true;
+                    
+                    for (let x = 0; x < COLS; x++) {
+                        if (!board[y][x]) {
+                            lineIsFull = false;
+                            break;
+                        }
+                    }
+                    
+                    if (lineIsFull) {
+                        linesCleared++;
+                        // Remove the line and add empty line at the top
+                        board.splice(y, 1);
+                        board.unshift(Array(COLS).fill(0));
+                        y++; // Check the same position again after shifting
+                    }
+                }
+                
+                if (linesCleared > 0) {
+                    // Play different sounds based on lines cleared
+                    if (linesCleared === 4) {
+                        createSound('square', 440, 0.2); // Tetris sound
+                        setTimeout(() => createSound('square', 660, 0.2), 200);
+                    } else {
+                        createSound('triangle', 330 + linesCleared * 50, 0.2);
+                    }
+                    
+                    // Update score - Classic NES Tetris scoring
+                    const linePoints = [0, 40, 100, 300, 1200];
+                    score += linePoints[linesCleared] * level;
+                    lines += linesCleared;
+                    
+                    // Level up every 10 lines
+                    level = Math.floor(lines / 10) + 1;
+                    dropInterval = Math.max(100, 1000 - (level - 1) * 100); // Speed up with each level
+                    
+                    updateScore();
+                }
+            }
+            
+            function spawnPiece() {
+                if (gameOver) return;
+                
+                currentPiece = nextPiece || getRandomPiece();
+                nextPiece = getRandomPiece();
+                drawNextPiece();
+                
+                // Check for immediate game over
+                if (checkCollision(currentPiece.matrix, currentPiece.x, currentPiece.y)) {
+                    gameOver = true;
+                    showGameOver();
+                }
+            }
+            
+            function updateScore() {
+                scoreValue.textContent = score;
+                levelValue.textContent = level;
+                linesValue.textContent = lines;
+            }
+            
+            function showGameOver() {
+                gameOverScreen.style.display = 'flex';
+                
+                // Disable pause button during game over
+                startButton.disabled = true;
+                startButton.style.opacity = '0.5';
+                
+                // Update high score if current score is higher
+                const highScoreElement = document.getElementById('highScoreValue');
+                const scoreCompare = document.getElementById('scoreCompare');
+                
+                finalScore.textContent = score;
+                highScoreElement.textContent = highScore;
+                
+                // Compare current score with high score
+                if (score > highScore) {
+                    // New high score achieved
+                    highScore = score;
+                    localStorage.setItem('blocksHighScore', highScore);
+                    highScoreElement.textContent = highScore;
+                    scoreCompare.textContent = 'NEW HIGH SCORE! 🏆';
+                    scoreCompare.style.color = 'var(--blocks-accent)';
+                    
+                    // Play a special sound for high score
+                    createSound('sine', 440, 0.1);
+                    setTimeout(() => createSound('sine', 554, 0.1), 100);
+                    setTimeout(() => createSound('sine', 659, 0.1), 200);
+                    setTimeout(() => createSound('sine', 880, 0.2), 300);
+                } else if (score === highScore) {
+                    scoreCompare.textContent = 'TIED YOUR BEST! 👏';
+                    scoreCompare.style.color = 'var(--blocks-accent)';
+                    
+                    // Play game over sound
+                    createSound('sawtooth', 150, 0.3);
+                    setTimeout(() => createSound('sawtooth', 130, 0.3), 300);
+                    setTimeout(() => createSound('sawtooth', 110, 0.5), 600);
+                } else {
+                    // Calculate how close to high score
+                    const percentage = Math.floor((score / highScore) * 100);
+                    scoreCompare.textContent = `${percentage}% OF YOUR BEST`;
+                    scoreCompare.style.color = 'var(--blocks-light)';
+                    
+                    // Play game over sound
+                    createSound('sawtooth', 150, 0.3);
+                    setTimeout(() => createSound('sawtooth', 130, 0.3), 300);
+                    setTimeout(() => createSound('sawtooth', 110, 0.5), 600);
+                }
+            }
+            
+            function resetGame() {
+                // Remove focus from button to prevent spacebar from activating it again
+                restartButton.blur();
+                
+                board = createEmptyBoard();
+                gameOver = false;
+                score = 0;
+                level = 1;
+                lines = 0;
+                dropInterval = 1000;
+                gameOverScreen.style.display = 'none';
+                
+                // Re-enable start button
+                startButton.disabled = false;
+                startButton.style.opacity = '1';
+                
+                updateScore();
+                spawnPiece();
+            }
+            
+            function update(time = 0) {
+                const deltaTime = time - lastTime;
+                lastTime = time;
+                
+                if (!gameStarted || paused || gameOver) {
+                    requestAnimationFrame(update);
+                    return;
+                }
+                
+                dropCounter += deltaTime;
+                if (dropCounter > dropInterval) {
+                    moveDown();
+                    dropCounter = 0;
+                }
+                
+                drawBoard();
+                requestAnimationFrame(update);
+            }
+            
+            function startGame() {
+                // Remove focus from button to prevent spacebar from activating it again
+                startButton.blur();
+                
+                if (!gameStarted) {
+                    gameStarted = true;
+                    spawnPiece();
+                    startButton.textContent = 'PAUSE';
+                    
+                    // Play start game sound
+                    createSound('square', 262, 0.1);
+                    setTimeout(() => createSound('square', 330, 0.1), 100);
+                    setTimeout(() => createSound('square', 392, 0.1), 200);
+                    
+                    // We no longer show gesture overlay when button is pressed
+                    // Overlay is only shown on initial load now
+                    
+                    update();
+                } else {
+                    paused = !paused;
+                    startButton.textContent = paused ? 'RESUME' : 'PAUSE';
+                    createSound('triangle', paused ? 220 : 440, 0.1);
+                }
+            }
+            
+            function toggleSound() {
+                // Remove focus from button
+                soundToggle.blur();
+                
+                soundEnabled = !soundEnabled;
+                
+                // Update sound icon
+                const soundIcon = document.getElementById('soundIcon');
+                soundIcon.textContent = soundEnabled ? '🔊' : '🔇';
+                
+                if (soundEnabled) {
+                    createSound('sine', 440, 0.1);
+                }
+            }
+            
+            // Function to close welcome screen and start game
+            function closeWelcomeScreen() {
+                if (welcomeScreen.style.display !== 'none') {
+                    welcomeScreen.style.display = 'none';
+                    
+                    // Play welcome sound
+                    createSound('sine', 523.25, 0.1); // C5
+                    setTimeout(() => createSound('sine', 659.25, 0.1), 150); // E5
+                    setTimeout(() => createSound('sine', 783.99, 0.1), 300); // G5
+                    setTimeout(() => createSound('sine', 1046.50, 0.2), 450); // C6
+                    
+                    // On mobile, show gesture controls next
+                    if (window.innerWidth < 768) {
+                        setTimeout(() => {
+                            gestureOverlay.style.display = 'flex';
+                        }, 300);
+                    }
+                }
+            }
+            
+            // Event Listeners for keyboard controls
+            document.addEventListener('keydown', event => {
+                // Close welcome screen on any key press
+                if (welcomeScreen.style.display !== 'none') {
+                    closeWelcomeScreen();
+                    return;
+                }
+                
+                // Prevent theme select from getting focus during gameplay
+                if (gameStarted && !gameOver && !paused && document.activeElement === mobileThemeSelect) {
+                    gameCanvas.focus();
+                }
+                
+                if (event.key === 'ArrowLeft') {
+                    moveLeft();
+                } else if (event.key === 'ArrowRight') {
+                    moveRight();
+                } else if (event.key === 'ArrowUp') {
+                    rotate();
+                } else if (event.key === 'ArrowDown') {
+                    moveDown();
+                } else if (event.key === ' ') { // Spacebar
+                    hardDrop();
+                } else if (event.key === 'p' || event.key === 'P') {
+                    if (gameStarted) {
+                        paused = !paused;
+                        startButton.textContent = paused ? 'RESUME' : 'PAUSE';
+                    }
+                }
+            });
+            
+            // Theme changing function
+            function changeTheme(themeName) {
+                if (!THEMES[themeName]) return;
+                
+                currentTheme = themeName;
+                COLORS = THEMES[currentTheme].colors;
+                
+                // Apply theme colors to CSS variables
+                document.documentElement.style.setProperty('--blocks-dark', THEMES[currentTheme].background);
+                document.documentElement.style.setProperty('--blocks-light', THEMES[currentTheme].text);
+                document.documentElement.style.setProperty('--blocks-accent', THEMES[currentTheme].textHighlight);
+                document.documentElement.style.setProperty('--blocks-border', THEMES[currentTheme].border);
+                
+                // Update board colors for pieces that are already placed
+                for (let y = 0; y < ROWS; y++) {
+                    for (let x = 0; x < COLS; x++) {
+                        if (board[y][x]) {
+                            // For existing pieces on the board, we need to find the type
+                            for (let type in COLORS) {
+                                // This is a simplistic way - ideally we'd store the piece type on the board
+                                // but for theme changing this approximate method should work
+                                board[y][x] = COLORS[type];
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Redraw the game
+                drawBoard();
+                drawNextPiece();
+                
+                // Play theme change sound
+                createSound('sine', 660, 0.1);
+                setTimeout(() => createSound('sine', 880, 0.1), 100);
+            }
+            
+            // Button controls
+            startButton.addEventListener('click', startGame);
+            restartButton.addEventListener('click', resetGame);
+            soundToggle.addEventListener('click', toggleSound);
+            
+            // Theme selector (we only use one now)
+            const mobileThemeSelect = document.getElementById('mobileThemeSelect');
+            
+            // Theme selector event listener
+            mobileThemeSelect.addEventListener('change', (e) => {
+                changeTheme(e.target.value);
+                // Remove focus immediately to prevent keyboard controls interference
+                mobileThemeSelect.blur();
+            });
+            
+            // Mobile touch gesture events
+            function handleTouchStart(e) {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            }
+            
+            function handleTouchEnd(e) {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                handleGesture();
+            }
+            
+            function handleTap(e) {
+                // Simple tap for soft drop
+                if (!gameStarted || gameOver || paused) return;
+                moveDown();
+            }
+            
+            function handleGesture() {
+                if (!gameStarted || gameOver || paused) return;
+                
+                const swipeThreshold = 30; // Minimum distance for swipe
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+                
+                // Detect horizontal or vertical swipe based on which delta is larger
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    // Horizontal swipe
+                    if (Math.abs(deltaX) > swipeThreshold) {
+                        if (deltaX > 0) {
+                            // Swipe right
+                            moveRight();
+                        } else {
+                            // Swipe left
+                            moveLeft();
+                        }
+                    }
+                } else {
+                    // Vertical swipe
+                    if (Math.abs(deltaY) > swipeThreshold) {
+                        if (deltaY > 0) {
+                            // Swipe down
+                            hardDrop();
+                        } else {
+                            // Swipe up
+                            rotate();
+                        }
+                    }
+                }
+            }
+            
+            // Add touch event listeners to game board
+            gameCanvas.addEventListener('touchstart', handleTouchStart, false);
+            gameCanvas.addEventListener('touchend', handleTouchEnd, false);
+            gameCanvas.addEventListener('click', handleTap, false);
+            
+            // Close the overlay when tapped but do not start the game immediately
+            gestureOverlay.addEventListener('click', () => {
+                // First hide the overlay
+                gestureOverlay.style.display = 'none';
+                
+                // On mobile, we want to wait for a separate tap to start the game
+                // This ensures players can read the instructions before gameplay starts
+                if (window.innerWidth < 768 && !gameStarted) {
+                    // Don't start the game automatically on first tap, just close the overlay
+                    return;
+                }
+                
+                // For desktop or if the game is already started but paused
+                if (paused) {
+                    paused = false;
+                    startButton.textContent = 'PAUSE';
+                }
+            });
+            
+            // Add touch event for welcome screen
+            welcomeScreen.addEventListener('click', closeWelcomeScreen);
+            
+            // Welcome screen is now shown by default, and the gesture overlay is shown after it's closed on mobile
+            // So we no longer show gesture overlay immediately
+            gestureOverlay.style.display = 'none';
+            
+            // Update overlay content for touch controls
+            const overlayTitle = gestureOverlay.querySelector('h3');
+            overlayTitle.textContent = 'TOUCH CONTROLS';
+            
+            // Update tap to close text
+            const tapText = gestureOverlay.querySelector('.tap-to-close');
+            tapText.textContent = 'Tap anywhere to close';
+            
+            // Set initial theme colors to match CSS
+            changeTheme('original');
+            
+            // Initialize theme selector with current theme
+            mobileThemeSelect.value = currentTheme;
+            
+            // Initial draw
+            drawBoard();
+            drawNextPiece();
+        })();
+    </script>
+</body>
+</html>
