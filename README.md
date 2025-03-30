@@ -27,4 +27,12 @@ TODO:
 
 ![one file blocks](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-auto-tetris.jpeg)
 
+onefile-guitar-tab-youtube
+==========================
+Learn to play your favourite songs, in sync with a youtube video if you want, all in a single HTML file. Features loading the most common Guitar Pro filetypes, midi playback, instrument selection, standard musical notation or TABs selection, auto scroll, loading a Youtube video, play/pause controls, sync points to fix the position of the score with the video progress, and light/dark theme selection.
 
+TODO:
+- Adjust the playing scroll position not to get out of sight.
+- Make the video-score sync work.
+
+![one file blocks](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-guitar-tab-youtube.jpeg)
