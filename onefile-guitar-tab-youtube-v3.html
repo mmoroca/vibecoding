@@ -1,0 +1,1200 @@
+
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Language" content="en,es,fr,de,ja,zh">
+    <title>Guitar Pro Tab Viewer with YouTube Sync</title>
+    
+    <!-- Bootstrap CSS (Replit theme) -->
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" id="theme-css">
+    
+    <!-- AlphaTab CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/alphaTab.min.css">
+    
+    <style>
+        .tab-container {
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid var(--bs-secondary);
+            border-radius: 4px;
+            padding: 10px;
+            position: relative;
+        }
+        
+        /* Theme-specific tab viewer styles */
+        html[data-bs-theme="dark"] .tab-container {
+            background-color: #121212;
+            color: #ffffff;
+        }
+        
+        html[data-bs-theme="light"] .tab-container {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        
+        /* Additional styles to ensure AlphaTab renders correctly */
+        .at-cursor-bar {
+            background-color: rgba(255, 50, 50, 0.2) !important; /* Red highlight for current bar */
+        }
+        
+        .at-selection div {
+            background-color: rgba(255, 255, 100, 0.2) !important; /* Yellow tint for selections */
+        }
+        
+        /* Progress indicator (vertical red line) */
+        .progress-indicator {
+            position: absolute;
+            width: 2px;
+            background-color: red;
+            z-index: 1000;
+            height: 100%;
+            top: 0;
+            pointer-events: none;
+        }
+        
+        /* Ensure any SVG elements in the tab viewer use theme-appropriate colors */
+        html[data-bs-theme="dark"] .tab-container svg text {
+            fill: #ffffff !important;
+        }
+        
+        html[data-bs-theme="dark"] .tab-container svg line, 
+        html[data-bs-theme="dark"] .tab-container svg path {
+            stroke: #aaaaaa !important;
+        }
+        
+        html[data-bs-theme="light"] .tab-container svg text {
+            fill: #000000 !important;
+        }
+        
+        html[data-bs-theme="light"] .tab-container svg line, 
+        html[data-bs-theme="light"] .tab-container svg path {
+            stroke: #333333 !important;
+        }
+        
+        .youtube-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .youtube-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .control-panel {
+            margin-bottom: 20px;
+        }
+        
+        .track-selector {
+            margin-bottom: 15px;
+        }
+        
+        .time-indicator {
+            font-family: monospace;
+            font-size: 1.2rem;
+        }
+        
+        .sync-point {
+            margin-bottom: 10px;
+        }
+        
+        .file-input-container {
+            margin-bottom: 20px;
+        }
+        
+        #syncPointsList {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .alert {
+            display: none;
+            margin-top: 15px;
+        }
+        
+        /* Light theme CSS overrides */
+        html[data-bs-theme="light"] {
+            color-scheme: light;
+        }
+        
+        .theme-toggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background-color: var(--bs-secondary-bg);
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        @media (max-width: 768px) {
+            .tab-container {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-toggle">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="themeToggle">
+            <label class="form-check-label" for="themeToggle">
+                <i class="fas fa-sun me-1"></i> Light Mode
+            </label>
+        </div>
+    </div>
+
+    <div class="container mt-4">
+        <h1 class="mb-4 text-center">Guitar Tab YouTube Sync Player</h1>
+        
+        <!-- Tab Viewer (Full Width) -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Tab Viewer</h3>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="file-input-container mb-0">
+                            <label for="tabFile" class="form-label">Upload Guitar Pro File (.gp, .gp3, .gp4, .gp5, .gpx)</label>
+                            <input class="form-control" type="file" id="tabFile" accept=".gp,.gp3,.gp4,.gp5,.gpx,.gp">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="track-selector mb-0">
+                            <label for="trackSelector" class="form-label">Select Instrument</label>
+                            <select class="form-select" id="trackSelector" disabled>
+                                <option>No file loaded</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="notation-selector mb-0">
+                            <label for="notationSelector" class="form-label">Display Format</label>
+                            <select class="form-select" id="notationSelector" disabled>
+                                <option value="scoretab">Tab and Standard Notation</option>
+                                <option value="tab">Tab Only</option>
+                                <option value="score">Standard Notation Only</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Error Alert -->
+                <div class="alert alert-danger" id="fileErrorAlert" role="alert">
+                    Error loading the tab file. Please make sure it's a valid Guitar Pro file.
+                </div>
+                
+                <div class="tab-container" id="tabContainer">
+                    <!-- Progress indicator (vertical red line) will be dynamically added here -->
+                    <div id="progressIndicator" class="progress-indicator" style="display: none;"></div>
+                    <div class="text-center py-5">
+                        <p class="text-muted">Upload a Guitar Pro file to view the tab</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- YouTube Player and Playback Controls -->
+        <div class="row">
+            <!-- YouTube Player (Left Column) -->
+            <div class="col-lg-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3>YouTube Player</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="youtubeUrl" class="form-label">YouTube Video URL</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=...">
+                                <button class="btn btn-primary" id="loadVideoBtn">Load Video</button>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-danger" id="videoErrorAlert" role="alert">
+                            Error loading the YouTube video. Please check the URL and try again.
+                        </div>
+                        
+                        <div class="youtube-container" id="youtubePlayer"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Playback Controls (Right Column) -->
+            <div class="col-lg-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3>Playback Controls</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center control-panel">
+                            <div class="col-md-12 mb-3">
+                                <div class="btn-group w-100" role="group">
+                                    <button type="button" class="btn btn-secondary" id="playBtn" disabled>
+                                        <i class="fas fa-play"></i> Play
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="pauseBtn" disabled>
+                                        <i class="fas fa-pause"></i> Pause
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="stopBtn" disabled>
+                                        <i class="fas fa-stop"></i> Stop
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <div class="d-flex justify-content-center align-items-center">
+                                    <span class="me-2">Time:</span>
+                                    <span class="time-indicator" id="currentTime">00:00</span>
+                                    <span class="mx-2">/</span>
+                                    <span class="time-indicator" id="totalTime">00:00</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="progressBar" class="form-label">Progress</label>
+                            <input type="range" class="form-range" id="progressBar" min="0" max="100" value="0" disabled>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Sync Points</h3>
+            </div>
+            <div class="card-body">
+                <p>Create sync points to match the tab position with video timestamps.</p>
+                
+                <div class="row mb-3 sync-point">
+                    <div class="col-md-3">
+                        <label for="videoTime" class="form-label">Video Time (seconds)</label>
+                        <input type="number" class="form-control" id="videoTime" step="0.1" min="0" value="0">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="barNumber" class="form-label">Bar Number</label>
+                        <input type="number" class="form-control" id="barNumber" min="1" value="1">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button class="btn btn-primary" id="addSyncPointBtn" disabled>Add Sync Point</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info" role="alert">
+                    Tip: Play the video, pause at key points, then add a sync point with the current bar number.
+                </div>
+                
+                <h5>Current Sync Points:</h5>
+                <div id="syncPointsList" class="list-group">
+                    <div class="list-group-item text-center text-muted">No sync points added</div>
+                </div>
+                
+                <div class="d-grid gap-2 mt-3">
+                    <button class="btn btn-danger" id="clearSyncPointsBtn" disabled>Clear All Sync Points</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <!-- YouTube API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    
+    <!-- AlphaTab -->
+    <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/alphaTab.min.js"></script>
+    
+    <!-- Bootstrap JS bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global variables
+        let player = null;
+        let alphaTab = null;
+        let syncPoints = [];
+        let currentTrack = 0;
+        let isTabLoaded = false;
+        let isVideoLoaded = false;
+        let isPlaying = false;
+        
+        // DOM Elements
+        const tabContainer = document.getElementById('tabContainer');
+        const tabFileInput = document.getElementById('tabFile');
+        const trackSelector = document.getElementById('trackSelector');
+        const notationSelector = document.getElementById('notationSelector');
+        const youtubeUrlInput = document.getElementById('youtubeUrl');
+        const loadVideoBtn = document.getElementById('loadVideoBtn');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const progressBar = document.getElementById('progressBar');
+        const currentTimeDisplay = document.getElementById('currentTime');
+        const totalTimeDisplay = document.getElementById('totalTime');
+        const videoTimeInput = document.getElementById('videoTime');
+        const barNumberInput = document.getElementById('barNumber');
+        const addSyncPointBtn = document.getElementById('addSyncPointBtn');
+        const clearSyncPointsBtn = document.getElementById('clearSyncPointsBtn');
+        const syncPointsList = document.getElementById('syncPointsList');
+        const fileErrorAlert = document.getElementById('fileErrorAlert');
+        const videoErrorAlert = document.getElementById('videoErrorAlert');
+        const themeToggle = document.getElementById('themeToggle');
+        const themeCssLink = document.getElementById('theme-css');
+        
+        // Initialize AlphaTab
+        function initAlphaTab() {
+            try {
+                // Get the current theme
+                const isDarkTheme = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+                
+                // Get notation style (default to scoretab if not set)
+                let staveProfile = 'scoretab';
+                if (notationSelector && !notationSelector.disabled) {
+                    staveProfile = notationSelector.value;
+                }
+                
+                // Apply theme-specific colors
+                const settings = {
+                    file: null,
+                    player: {
+                        enablePlayer: true,
+                        soundFont: 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/soundfont/sonivox.sf2',
+                        scrollElement: tabContainer,
+                        enableCursor: true,
+                        enableUserInteraction: true
+                    },
+                    display: {
+                        layoutMode: 'page',
+                        staveProfile: staveProfile,
+                        // Improved visibility
+                        scale: 1.1,
+                        // Better visualization
+                        barCountPerPartial: 4,
+                        // Auto scroll settings
+                        autoScroll: 'vertical',
+                        scrollMode: 'smooth',
+                        scrollOffsetY: -30,
+                        // Theme-based colors
+                        resources: {
+                            mainGlyphColor: isDarkTheme ? '#ffffff' : '#000000',
+                            scoreInfoColor: isDarkTheme ? '#ffffff' : '#000000',
+                            barNumberColor: isDarkTheme ? '#ffffff' : '#000000',
+                            barSeparatorColor: isDarkTheme ? '#aaaaaa' : '#333333',
+                            backgroundColor: isDarkTheme ? '#121212' : '#ffffff',
+                            staffLineColor: isDarkTheme ? '#777777' : '#333333'
+                        }
+                    }
+                };
+                
+                // Check if alphaTab is properly loaded
+                if (typeof window.alphaTab === 'undefined') {
+                    console.error('AlphaTab library not loaded properly');
+                    setTimeout(initAlphaTab, 500); // Retry after a short delay
+                    return;
+                }
+                
+                // Create the API instance
+                alphaTab = new window.alphaTab.AlphaTabApi(tabContainer, settings);
+                
+                // AlphaTab event listeners
+                alphaTab.scoreLoaded.on((score) => {
+                    console.log('Score loaded', score);
+                    isTabLoaded = true;
+                    
+                    // Clear any loading messages (instrument changing or notation style update)
+                    const loadingMessages = tabContainer.querySelectorAll('.text-center');
+                    loadingMessages.forEach(msg => {
+                        if (msg.querySelector('.text-muted') && 
+                            (msg.textContent.includes('Changing instrument') || 
+                             msg.textContent.includes('Updating notation style') ||
+                             msg.textContent.includes('Upload a Guitar Pro file'))) {
+                            msg.remove();
+                        }
+                    });
+                    
+                    // Update the instrument selector and UI controls
+                    updateTrackSelector(score);
+                    updateControlStates();
+                });
+                
+                alphaTab.playerStateChanged.on((e) => {
+                    console.log('Player state changed:', e.state);
+                });
+                
+                alphaTab.playerPositionChanged.on((e) => {
+                    // Update progress display when the tab player position changes
+                    if (!isPlaying) return;
+                    updateProgressDisplay();
+                });
+                
+                console.log('AlphaTab initialized successfully');
+            } catch (error) {
+                console.error('Error initializing AlphaTab:', error);
+                // Retry initialization after a short delay
+                setTimeout(initAlphaTab, 1000);
+            }
+        }
+        
+        // Update the track selector dropdown
+        function updateTrackSelector(score) {
+            try {
+                // Get a fresh reference to the selector
+                const selectorElement = document.getElementById('trackSelector');
+                if (!selectorElement) {
+                    console.error('Track selector element not found');
+                    return;
+                }
+                
+                // Clear the dropdown
+                selectorElement.innerHTML = '';
+                selectorElement.disabled = false;
+                
+                // Add options for each track
+                score.tracks.forEach((track, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${track.name} (${track.staves.length} staves)`;
+                    selectorElement.appendChild(option);
+                });
+                
+                // Create a separate change handler function to avoid closures
+                function onTrackChange() {
+                    try {
+                        const selectedValue = parseInt(this.value);
+                        if (isNaN(selectedValue)) return;
+                        
+                        console.log('Selected instrument:', selectedValue);
+                        currentTrack = selectedValue;
+                        
+                        // Safety check - make sure AlphaTab is initialized
+                        if (!alphaTab || !alphaTab.score) {
+                            console.error('AlphaTab or score not available yet');
+                            return;
+                        }
+                        
+                        // Get the current file for potential reload
+                        const currentFile = tabFileInput.files && tabFileInput.files.length > 0 
+                            ? tabFileInput.files[0] 
+                            : null;
+                        
+                        // The safest way is to reload the entire AlphaTab instance
+                        alphaTab.destroy();
+                        alphaTab = null;
+                        
+                        // Clear container and show loading message
+                        tabContainer.innerHTML = '<div class="text-center py-5"><p class="text-muted">Changing instrument...</p></div>';
+                        
+                        // Re-initialize AlphaTab with fresh settings
+                        setTimeout(() => {
+                            // Re-initialize alphaTab
+                            initAlphaTab();
+                            
+                            // If we have a file, reload it
+                            if (currentFile) {
+                                setTimeout(() => {
+                                    try {
+                                        // Set the current track before loading
+                                        window.selectedTrackAfterLoad = currentTrack;
+                                        loadTabFile(currentFile);
+                                    } catch (reloadErr) {
+                                        console.error('Error reloading after track change:', reloadErr);
+                                    }
+                                }, 300);
+                            }
+                        }, 200);
+                    } catch (e) {
+                        console.error('Error in track selection:', e);
+                    }
+                }
+                
+                // Remove existing listeners (if any) by cloning
+                const newSelector = selectorElement.cloneNode(true);
+                selectorElement.parentNode.replaceChild(newSelector, selectorElement);
+                
+                // Attach the change handler to the new element
+                document.getElementById('trackSelector').addEventListener('change', onTrackChange);
+                
+            } catch (error) {
+                console.error('Error in updateTrackSelector:', error);
+            }
+        }
+        
+        // Load Guitar Pro file
+        function loadTabFile(file) {
+            fileErrorAlert.style.display = 'none';
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    
+                    // Check if we should load a specific track or the default
+                    const trackToLoad = window.selectedTrackAfterLoad !== undefined ? 
+                        [window.selectedTrackAfterLoad] : [0];
+                    
+                    // Reset the selected track value after using it
+                    if (window.selectedTrackAfterLoad !== undefined) {
+                        currentTrack = window.selectedTrackAfterLoad;
+                        window.selectedTrackAfterLoad = undefined;
+                    }
+                    
+                    // Load the file with the appropriate track
+                    alphaTab.load(data, trackToLoad);
+                } catch (error) {
+                    console.error('Error loading tab file:', error);
+                    fileErrorAlert.style.display = 'block';
+                }
+            };
+            reader.onerror = function() {
+                console.error('Error reading file');
+                fileErrorAlert.style.display = 'block';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // YouTube API functions
+        function onYouTubeIframeAPIReady() {
+            console.log('YouTube iframe API ready');
+            loadVideoBtn.addEventListener('click', loadYouTubeVideo);
+        }
+        
+        function loadYouTubeVideo() {
+            videoErrorAlert.style.display = 'none';
+            const url = youtubeUrlInput.value.trim();
+            if (!url) return;
+            
+            const videoId = extractYouTubeId(url);
+            if (!videoId) {
+                videoErrorAlert.style.display = 'block';
+                return;
+            }
+            
+            // If player already exists, destroy it
+            if (player) {
+                player.destroy();
+            }
+            
+            // Create a div container for the player
+            const youtubeContainer = document.getElementById('youtubePlayer');
+            youtubeContainer.innerHTML = '<div id="actualYoutubePlayer"></div>';
+            
+            player = new YT.Player('actualYoutubePlayer', {
+                height: '360',
+                width: '640',
+                videoId: videoId,
+                playerVars: {
+                    'playsinline': 1,
+                    'rel': 0,
+                    'enablejsapi': 1,
+                    'origin': window.location.origin
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
+            });
+        }
+        
+        function extractYouTubeId(url) {
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+        
+        function onPlayerReady(event) {
+            console.log('YouTube player ready');
+            isVideoLoaded = true;
+            updateControlStates();
+            
+            // Set total duration
+            const duration = player.getDuration();
+            totalTimeDisplay.textContent = formatTime(duration);
+            progressBar.max = duration;
+            
+            // Start position updates
+            setInterval(updateProgressFromVideo, 500);
+        }
+        
+        function onPlayerStateChange(event) {
+            // 1 = playing, 2 = paused, 0 = ended
+            if (event.data === YT.PlayerState.PLAYING) {
+                isPlaying = true;
+                syncTabToVideo();
+            } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+                isPlaying = false;
+            }
+        }
+        
+        function onPlayerError(event) {
+            console.error('YouTube player error:', event);
+            videoErrorAlert.style.display = 'block';
+            isVideoLoaded = false;
+            updateControlStates();
+        }
+        
+        // Playback controls - can work with either YouTube or AlphaTab's built-in player
+        function play() {
+            // Check if tab is loaded (required for any playback)
+            if (!isTabLoaded) return;
+            
+            if (isVideoLoaded && player) {
+                // Use YouTube if available
+                player.playVideo();
+                isPlaying = true;
+            } else {
+                // Use AlphaTab's built-in player when no video is loaded
+                if (alphaTab) {
+                    alphaTab.play();
+                    isPlaying = true;
+                    
+                    // Update progress indicator during playback
+                    const updateIndicator = () => {
+                        if (alphaTab.playerState === alphaTab.PlayerState.Playing) {
+                            const currentBar = alphaTab.playerState.currentBeat ? 
+                                alphaTab.playerState.currentBeat.beat.measure.index : 0;
+                            updateProgressIndicator(currentBar);
+                            requestAnimationFrame(updateIndicator);
+                        }
+                    };
+                    
+                    requestAnimationFrame(updateIndicator);
+                }
+            }
+        }
+        
+        function pause() {
+            if (!isTabLoaded) return;
+            
+            if (isVideoLoaded && player) {
+                // Pause YouTube
+                player.pauseVideo();
+            } else if (alphaTab) {
+                // Pause AlphaTab player
+                alphaTab.pause();
+            }
+            
+            isPlaying = false;
+        }
+        
+        function stop() {
+            if (!isTabLoaded) return;
+            
+            if (isVideoLoaded && player) {
+                // Stop YouTube
+                player.seekTo(0);
+                player.pauseVideo();
+            } else if (alphaTab) {
+                // Stop AlphaTab player
+                alphaTab.stop();
+            }
+            
+            // Reset cursor position
+            if (alphaTab) {
+                alphaTab.playerCursorUpdateTime = 0;
+            }
+            
+            isPlaying = false;
+        }
+        
+        // Update progress display
+        function updateProgressDisplay() {
+            if (!isVideoLoaded) return;
+            
+            const currentTime = player.getCurrentTime();
+            currentTimeDisplay.textContent = formatTime(currentTime);
+            progressBar.value = currentTime;
+            
+            // If we're playing, sync the tab position to the video
+            if (isPlaying) {
+                syncTabToVideo();
+            }
+        }
+        
+        function updateProgressFromVideo() {
+            if (!isVideoLoaded || !player) return;
+            
+            const currentTime = player.getCurrentTime();
+            currentTimeDisplay.textContent = formatTime(currentTime);
+            progressBar.value = currentTime;
+        }
+        
+        // Format time as MM:SS
+        function formatTime(seconds) {
+            seconds = Math.floor(seconds);
+            const minutes = Math.floor(seconds / 60);
+            seconds = seconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Sync tab to video position
+        function syncTabToVideo() {
+            if (!isPlaying || syncPoints.length < 2) return;
+            
+            const currentTime = player.getCurrentTime();
+            
+            // Find the two sync points that bracket the current time
+            let prevPoint = syncPoints[0];
+            let nextPoint = syncPoints[syncPoints.length - 1];
+            
+            for (let i = 0; i < syncPoints.length - 1; i++) {
+                if (syncPoints[i].videoTime <= currentTime && syncPoints[i + 1].videoTime > currentTime) {
+                    prevPoint = syncPoints[i];
+                    nextPoint = syncPoints[i + 1];
+                    break;
+                }
+            }
+            
+            // If we're before the first sync point
+            if (currentTime <= prevPoint.videoTime) {
+                if (alphaTab.playerState === alphaTab.PlayerState.Playing) {
+                    alphaTab.pause();
+                }
+                alphaTab.playerCursorUpdateTime = prevPoint.barIndex;
+                // Ensure we scroll to the cursor position
+                alphaTab.renderer.scrollToMeasure(prevPoint.barIndex);
+                return;
+            }
+            
+            // If we're after the last sync point
+            if (currentTime >= nextPoint.videoTime) {
+                if (alphaTab.playerState === alphaTab.PlayerState.Playing) {
+                    alphaTab.pause();
+                }
+                alphaTab.playerCursorUpdateTime = nextPoint.barIndex;
+                // Ensure we scroll to the cursor position
+                alphaTab.renderer.scrollToMeasure(nextPoint.barIndex);
+                return;
+            }
+            
+            // Interpolate between prevPoint and nextPoint
+            const timeDiff = nextPoint.videoTime - prevPoint.videoTime;
+            const barDiff = nextPoint.barIndex - prevPoint.barIndex;
+            const timeRatio = (currentTime - prevPoint.videoTime) / timeDiff;
+            const currentBar = prevPoint.barIndex + Math.floor(barDiff * timeRatio);
+            
+            // Update the tab display with cursor and autoscroll
+            if (alphaTab.playerState === alphaTab.PlayerState.Playing) {
+                alphaTab.pause();
+            }
+            alphaTab.playerCursorUpdateTime = currentBar;
+            
+            // Ensure we scroll to the cursor position
+            alphaTab.renderer.scrollToMeasure(currentBar);
+            
+            // Add a visual indicator of current position
+            updateProgressIndicator(currentBar);
+        }
+        
+        // Add visual progress indicator for current measure (vertical red line)
+        function updateProgressIndicator(measureIndex) {
+            // Get the progress indicator element
+            const progressIndicator = document.getElementById('progressIndicator');
+            
+            if (!progressIndicator) {
+                console.error('Progress indicator element not found');
+                return;
+            }
+            
+            try {
+                // First, make sure the indicator is visible
+                progressIndicator.style.display = 'block';
+                
+                // Find the bar element for the current measure using different selectors
+                // Try .at-measure selector first
+                let barElements = document.querySelectorAll('.at-measure');
+                
+                // If that doesn't work, try [data-measure] selector
+                if (!barElements || barElements.length === 0) {
+                    barElements = document.querySelectorAll('[data-measure]');
+                    if (!barElements || barElements.length === 0) {
+                        console.log('No measure elements found yet');
+                        return;
+                    }
+                }
+                
+                // Get the correct bar element
+                let targetMeasure = null;
+                
+                // First try exact match
+                for (const measure of barElements) {
+                    const measureIndexAttr = measure.getAttribute('data-measure');
+                    if (measureIndexAttr && parseInt(measureIndexAttr) === measureIndex) {
+                        targetMeasure = measure;
+                        break;
+                    }
+                }
+                
+                // If no exact match, find closest
+                if (!targetMeasure) {
+                    let closestDiff = Infinity;
+                    for (const measure of barElements) {
+                        const measureIndexAttr = measure.getAttribute('data-measure');
+                        if (measureIndexAttr) {
+                            const mIndex = parseInt(measureIndexAttr);
+                            const diff = Math.abs(mIndex - measureIndex);
+                            if (diff < closestDiff) {
+                                closestDiff = diff;
+                                targetMeasure = measure;
+                            }
+                        }
+                    }
+                }
+                
+                // If still no match, fallback to visible measure
+                if (!targetMeasure) {
+                    // Fallback - use the first visible measure in viewport
+                    const tabContainerRect = tabContainer.getBoundingClientRect();
+                    for (const measure of barElements) {
+                        const measureRect = measure.getBoundingClientRect();
+                        if (measureRect.top > tabContainerRect.top && 
+                            measureRect.bottom < tabContainerRect.bottom) {
+                            targetMeasure = measure;
+                            break;
+                        }
+                    }
+                    
+                    // Last resort fallback - use the first measure
+                    if (!targetMeasure && barElements.length > 0) {
+                        targetMeasure = barElements[0];
+                    }
+                }
+                
+                if (targetMeasure) {
+                    const measureRect = targetMeasure.getBoundingClientRect();
+                    const tabContainerRect = tabContainer.getBoundingClientRect();
+                    
+                    // Calculate position - center of the measure
+                    const measureCenterX = measureRect.left + (measureRect.width / 2);
+                    const relativeLeft = measureCenterX - tabContainerRect.left;
+                    
+                    // Position the vertical red line indicator
+                    progressIndicator.style.left = `${relativeLeft}px`;
+                    progressIndicator.style.height = `${tabContainerRect.height}px`;
+                    progressIndicator.style.width = '2px';  // Ensure it's a thin line
+                    progressIndicator.style.backgroundColor = 'red';
+                }
+            } catch (error) {
+                console.error('Error updating progress indicator:', error);
+            }
+        }
+        
+        // Sync points management
+        function addSyncPoint() {
+            if (!isTabLoaded || !isVideoLoaded) return;
+            
+            const videoTime = parseFloat(videoTimeInput.value);
+            const barNumber = parseInt(barNumberInput.value);
+            
+            if (isNaN(videoTime) || isNaN(barNumber) || barNumber < 1) {
+                alert('Please enter valid values for video time and bar number.');
+                return;
+            }
+            
+            // Create new sync point
+            const syncPoint = {
+                videoTime: videoTime,
+                barIndex: barNumber - 1 // Convert to 0-based index
+            };
+            
+            // Add to the list and sort by video time
+            syncPoints.push(syncPoint);
+            syncPoints.sort((a, b) => a.videoTime - b.videoTime);
+            
+            // Update the UI
+            updateSyncPointsList();
+            videoTimeInput.value = (videoTime + 5).toFixed(1); // Increment for next sync point
+            barNumberInput.value = barNumber + 4; // Increment for next sync point
+        }
+        
+        function updateSyncPointsList() {
+            syncPointsList.innerHTML = '';
+            
+            if (syncPoints.length === 0) {
+                syncPointsList.innerHTML = '<div class="list-group-item text-center text-muted">No sync points added</div>';
+                return;
+            }
+            
+            syncPoints.forEach((point, index) => {
+                const item = document.createElement('div');
+                item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                
+                const content = document.createElement('span');
+                content.textContent = `Video: ${formatTime(point.videoTime)} → Bar: ${point.barIndex + 1}`;
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-sm btn-danger';
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                deleteBtn.onclick = () => {
+                    syncPoints.splice(index, 1);
+                    updateSyncPointsList();
+                };
+                
+                item.appendChild(content);
+                item.appendChild(deleteBtn);
+                syncPointsList.appendChild(item);
+            });
+            
+            clearSyncPointsBtn.disabled = false;
+        }
+        
+        function clearSyncPoints() {
+            syncPoints = [];
+            updateSyncPointsList();
+            clearSyncPointsBtn.disabled = true;
+        }
+        
+        function updateControlStates() {
+            // Update UI control states based on loaded content
+            const tabOnlyLoaded = isTabLoaded && !isVideoLoaded;
+            const bothLoaded = isTabLoaded && isVideoLoaded;
+            
+            // Enable playback buttons if either tab is loaded alone or both tab and video are loaded
+            playBtn.disabled = !isTabLoaded;
+            pauseBtn.disabled = !isTabLoaded;
+            stopBtn.disabled = !isTabLoaded;
+            
+            // Progress bar and sync points only work with video
+            progressBar.disabled = !bothLoaded;
+            addSyncPointBtn.disabled = !bothLoaded;
+            
+            // Enable notation selector when tab is loaded
+            if (isTabLoaded) {
+                notationSelector.disabled = false;
+            }
+            
+            // Configure different behaviors based on what's loaded
+            if (bothLoaded) {
+                // Both tab and video are loaded - enable video syncing
+                progressBar.addEventListener('input', () => {
+                    const time = parseFloat(progressBar.value);
+                    if (player) {
+                        player.seekTo(time);
+                        currentTimeDisplay.textContent = formatTime(time);
+                        // Update tab position when slider changes
+                        syncTabToVideo();
+                    }
+                });
+                
+                // Get current video time for sync point
+                videoTimeInput.addEventListener('focus', () => {
+                    if (player) {
+                        videoTimeInput.value = player.getCurrentTime().toFixed(1);
+                    }
+                });
+                
+                // Start frequent updates to ensure tab follows video
+                setInterval(() => {
+                    if (isPlaying) {
+                        syncTabToVideo();
+                    }
+                }, 200); // Check more frequently for better synchronization
+            } else if (tabOnlyLoaded) {
+                // Only tab is loaded - show a message about playback
+                if (alphaTab && !document.getElementById('tabOnlyPlaybackMessage')) {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.id = 'tabOnlyPlaybackMessage';
+                    messageDiv.className = 'alert alert-info mt-3';
+                    messageDiv.innerHTML = 'No YouTube video loaded. Using built-in audio playback. <strong>Use the Play button to hear the tab played!</strong>';
+                    document.querySelector('.control-panel').appendChild(messageDiv);
+                    
+                    // Update time display with AlphaTab's playback position
+                    alphaTab.playerPositionChanged.on((e) => {
+                        if (alphaTab.playerState === alphaTab.PlayerState.Playing) {
+                            // Convert beat position to time in seconds
+                            const timePosition = e.currentTime / 1000; // AlphaTab time is in milliseconds
+                            currentTimeDisplay.textContent = formatTime(timePosition);
+                            
+                            // Set a basic max duration if available
+                            if (alphaTab.score) {
+                                const totalDuration = alphaTab.score.duration / 1000;
+                                totalTimeDisplay.textContent = formatTime(totalDuration);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Theme toggling
+        function toggleTheme(isLight) {
+            document.documentElement.setAttribute('data-bs-theme', isLight ? 'light' : 'dark');
+            
+            // Update stylesheet reference
+            if (isLight) {
+                themeCssLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css';
+            } else {
+                themeCssLink.href = 'https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css';
+            }
+            
+            // Save preference
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+            
+            // If we have a tab loaded, reinitialize AlphaTab with the new theme colors
+            if (isTabLoaded && alphaTab) {
+                try {
+                    console.log("Reinitializing AlphaTab with new theme");
+                    // Save current state
+                    const currentTrackIndex = currentTrack;
+                    
+                    // Store current loaded data if available
+                    let scoreData = null;
+                    try {
+                        // Try to access the score data - may not always be available
+                        if (alphaTab.score && alphaTab.score.tracks.length > 0) {
+                            scoreData = alphaTab.score;
+                        }
+                    } catch (err) {
+                        console.warn('Could not access score data:', err);
+                    }
+                    
+                    // Wait for the theme change to take effect
+                    setTimeout(() => {
+                        try {
+                            // Re-initialize for new theme colors
+                            alphaTab.destroy();
+                            alphaTab = null;
+                            
+                            // Clear and recreate the tab container
+                            tabContainer.innerHTML = '<div class="text-center py-5"><p class="text-muted">Updating theme...</p></div>';
+                            
+                            // Re-initialize AlphaTab with new theme settings
+                            initAlphaTab();
+                            
+                            // If there was a score loaded, attempt to reload it
+                            if (scoreData) {
+                                setTimeout(() => {
+                                    try {
+                                        // Re-render all tracks from the score
+                                        tabFileInput.dispatchEvent(new Event('change'));
+                                    } catch (reloadErr) {
+                                        console.error('Error reloading tab after theme change:', reloadErr);
+                                        alert('Theme changed. You may need to reload your tab file for proper display.');
+                                    }
+                                }, 300);
+                            }
+                        } catch (error) {
+                            console.error('Error in theme change handler:', error);
+                        }
+                    }, 100);
+                } catch (error) {
+                    console.error('Error preparing for theme change:', error);
+                }
+            }
+        }
+        
+        // Handle notation style changes
+        function changeNotationStyle() {
+            if (!isTabLoaded || !alphaTab) return;
+            
+            console.log('Changing notation style to:', notationSelector.value);
+            
+            try {
+                // Remember current file and track
+                const currentTab = tabFileInput.files[0];
+                
+                // Destroy and recreate AlphaTab with new settings
+                alphaTab.destroy();
+                alphaTab = null;
+                
+                // Clear and recreate the tab container
+                tabContainer.innerHTML = '<div class="text-center py-5"><p class="text-muted">Updating notation style...</p></div>';
+                
+                // Re-initialize with new settings
+                initAlphaTab();
+                
+                // Reload the file if we had one
+                if (currentTab) {
+                    setTimeout(() => {
+                        loadTabFile(currentTab);
+                    }, 300);
+                }
+            } catch (error) {
+                console.error('Error changing notation style:', error);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize AlphaTab
+            initAlphaTab();
+            
+            // Initialize YouTube API if not already loaded
+            if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
+                // Load the YouTube iframe API script dynamically
+                const tag = document.createElement('script');
+                tag.src = "https://www.youtube.com/iframe_api";
+                const firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+            } else {
+                console.log('YouTube API already loaded');
+                loadVideoBtn.addEventListener('click', loadYouTubeVideo);
+            }
+            
+            // Set up file input listener
+            tabFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    loadTabFile(e.target.files[0]);
+                }
+            });
+            
+            // Set up notation selector listener
+            notationSelector.addEventListener('change', changeNotationStyle);
+            
+            // Set up playback control listeners
+            playBtn.addEventListener('click', play);
+            pauseBtn.addEventListener('click', pause);
+            stopBtn.addEventListener('click', stop);
+            
+            // Set up sync point listeners
+            addSyncPointBtn.addEventListener('click', addSyncPoint);
+            clearSyncPointsBtn.addEventListener('click', clearSyncPoints);
+            
+            // Set up theme toggle (make sure it's visible from start)
+            const savedTheme = localStorage.getItem('theme');
+            const toggleLabel = document.querySelector('label[for="themeToggle"]');
+            
+            if (savedTheme === 'light') {
+                themeToggle.checked = true;
+                toggleTheme(true);
+                toggleLabel.innerHTML = '<i class="fas fa-moon me-1"></i> Dark Mode';
+            } else {
+                toggleLabel.innerHTML = '<i class="fas fa-sun me-1"></i> Light Mode';
+            }
+            
+            // Make sure theme toggle is visible
+            document.querySelector('.theme-toggle').style.opacity = '1';
+            
+            themeToggle.addEventListener('change', (e) => {
+                toggleTheme(e.target.checked);
+                
+                // Update toggle label
+                const toggleLabel = document.querySelector('label[for="themeToggle"]');
+                if (e.target.checked) {
+                    toggleLabel.innerHTML = '<i class="fas fa-moon me-1"></i> Dark Mode';
+                } else {
+                    toggleLabel.innerHTML = '<i class="fas fa-sun me-1"></i> Light Mode'; 
+                }
+            });
+            
+            // Initialize with placeholder data
+            updateSyncPointsList();
+        });
+    </script>
+</body>
+</html>
