@@ -1,0 +1,1743 @@
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>ZX Spectrum Emulator</title>
+            <style>
+                body {
+                    font-family: 'Courier New', monospace;
+                    background-color: #222;
+                    color: #f0f0f0;
+                    margin: 0;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                }
+
+                .container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                    width: 100%;
+                    max-width: 800px;
+                }
+
+                .screen-container {
+                    position: relative;
+                    width: 100%;
+                    aspect-ratio: 4/3;
+                    background-color: #000;
+                    border: 10px solid #555;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    margin: 20px 0;
+                }
+
+                #spectrum-display {
+                    image-rendering: pixelated;
+                    width: 100%;
+                    height: 100%;
+                    background-color: #000;
+                    display: block;
+                }
+
+                /* Virtual keyboard has been removed */
+
+                .controls {
+                    display: flex;
+                    gap: 10px;
+                    margin-bottom: 10px;
+                    flex-wrap: wrap;
+                }
+
+                button {
+                    background-color: #333;
+                    color: #fff;
+                    border: 1px solid #666;
+                    border-radius: 4px;
+                    padding: 8px 16px;
+                    cursor: pointer;
+                }
+
+                button:hover {
+                    background-color: #444;
+                }
+
+                button:active {
+                    background-color: #555;
+                }
+
+                /* BASIC editor has been removed */
+
+                /* Tabs have been removed */
+
+                .status {
+                    font-size: 12px;
+                    color: #aaa;
+                    margin-top: 10px;
+                }
+
+                .fps-control, .sound-control {
+                    display: flex;
+                    align-items: center;
+                    margin-left: 10px;
+                    gap: 5px;
+                    background-color: #333;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                }
+
+                #fps-counter {
+                    position: absolute;
+                    top: 5px;
+                    right: 5px;
+                    background-color: rgba(0,0,0,0.5);
+                    color: #0f0;
+                    padding: 2px 5px;
+                    font-size: 12px;
+                    border-radius: 3px;
+                    z-index: 5;
+                }
+
+                #rom-select {
+                    padding: 6px;
+                    background-color: #333;
+                    color: #fff;
+                    border: 1px solid #666;
+                    border-radius: 4px;
+                }
+
+                .border-container {
+                    background-color: #000;
+                    padding: 32px;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                }
+
+                .loading {
+                    color: #fff;
+                    background-color: #333;
+                    padding: 20px;
+                    border-radius: 5px;
+                    text-align: center;
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    z-index: 10;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>ZX Spectrum Emulator</h1>
+
+                <div class="controls">
+                    <button id="start-button">Start</button>
+                    <button id="pause-button">Pause</button>
+                    <button id="reset-button">Reset</button>
+                    <select id="rom-select">
+                        <option value="48k">ZX Spectrum 48K</option>
+                        <option value="128">ZX Spectrum 128K</option>
+                        <option value="plus2">ZX Spectrum +2</option>
+                        <option value="plus3">ZX Spectrum +3</option>
+                    </select>
+                    <div class="fps-control">
+                        <input type="checkbox" id="show-fps" />
+                        <label for="show-fps">Show FPS</label>
+                    </div>
+                    <div class="sound-control">
+                        <input type="checkbox" id="enable-sound" checked />
+                        <label for="enable-sound">Sound</label>
+                    </div>
+                    <div class="fast-forward-control">
+                        <input type="checkbox" id="fast-forward" />
+                        <label for="fast-forward">Fast Forward</label>
+                    </div>
+                </div>
+
+                <div class="screen-container">
+                    <canvas id="spectrum-display" width="256" height="192"></canvas>
+                    <div id="fps-counter" style="display: none;">0 FPS</div>
+                    <div id="loading" class="loading" style="display: none;">Loading ROM...</div>
+                </div>
+
+                <div class="status" id="status-display">Ready.</div>
+                
+                <div id="keyboard-status" style="margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 5px; font-family: monospace; font-size: 12px;">
+                    Keyboard status will appear here when keys are pressed.
+                </div>
+            </div>
+
+            <!-- Load Z80.js from jsDelivr (a CDN that properly serves GitHub content) -->
+            <script src="https://cdn.jsdelivr.net/gh/DrGoldfire/Z80.js@master/Z80.js"></script>
+
+            <script>
+                // ZX Spectrum Emulator
+
+                // Constants for ZX Spectrum hardware
+                const SPECTRUM_SCREEN_WIDTH = 256;
+                const SPECTRUM_SCREEN_HEIGHT = 192;
+                const MEMORY_SIZE = 65536; // 64K address space
+                const TOTAL_MEMORY_SIZE_128K = 131072; // 128K total for 128K models
+                const ROM_SIZE = 16384; // 16K
+                const ROM_SIZE_128K = 32768; // 32K (2 ROMs for 128K models)
+                const DISPLAY_FILE_START = 0x4000;
+                const DISPLAY_FILE_END = 0x57FF;
+                const ATTR_FILE_START = 0x5800;
+                const ATTR_FILE_END = 0x5AFF;
+                
+                // Memory paging constants (for 128K models)
+                const PORT_7FFD = 0x7FFD; // Memory paging port
+                const PORT_FFFD = 0xFFFD; // AY sound chip register select port
+                const PORT_BFFD = 0xBFFD; // AY sound chip data port
+
+                // ZX Spectrum colors (in RGB)
+                const COLORS = [
+                    [0, 0, 0],       // BLACK
+                    [0, 0, 192],     // BLUE
+                    [192, 0, 0],     // RED
+                    [192, 0, 192],   // MAGENTA
+                    [0, 192, 0],     // GREEN
+                    [0, 192, 192],   // CYAN
+                    [192, 192, 0],   // YELLOW
+                    [192, 192, 192], // WHITE
+                    [0, 0, 0],       // BRIGHT BLACK
+                    [0, 0, 255],     // BRIGHT BLUE
+                    [255, 0, 0],     // BRIGHT RED
+                    [255, 0, 255],   // BRIGHT MAGENTA
+                    [0, 255, 0],     // BRIGHT GREEN
+                    [0, 255, 255],   // BRIGHT CYAN
+                    [255, 255, 0],   // BRIGHT YELLOW
+                    [255, 255, 255]  // BRIGHT WHITE
+                ];
+
+                // ZX Spectrum Emulator class
+                class ZXSpectrum {
+                    constructor(canvas) {
+                        // Initialize canvas and context
+                        this.canvas = canvas;
+                        this.ctx = canvas.getContext('2d');
+                        this.imageData = this.ctx.createImageData(SPECTRUM_SCREEN_WIDTH, SPECTRUM_SCREEN_HEIGHT);
+
+                        // Initialize memory and I/O ports
+                        this.memory = new Uint8Array(MEMORY_SIZE);
+                        this.ports = new Map();
+                        
+                        // Initialize memory banks for 128K models (8 banks of 16K each)
+                        this.memoryBanks = [];
+                        for (let i = 0; i < 8; i++) {
+                            this.memoryBanks[i] = new Uint8Array(16384); // 16K per bank
+                        }
+                        
+                        // Initialize memory paging settings
+                        this.bankSwitchRegister = 0; // Port 0x7FFD value
+                        this.pagingEnabled = true;   // Can be disabled with bit 5
+                        this.romSelection = 0;       // ROM 0 or 1 (bit 4)
+                        this.screenSelection = 0;    // Screen 0 or 1 (bit 3)
+                        this.ramBank = 0;            // RAM bank 0-7 at 0xC000 (bits 0-2)
+                        this.is128K = false;         // Flag for 128K model
+                        
+                        // Initialize Z80 CPU with Z80.js
+                        this.setupZ80();
+
+                        // Initialize keyboard matrix
+                        this.keyboardMatrix = new Array(8).fill(0xFF);
+                        
+                        // Set for tracking active keys (for keyboard status display)
+                        this.activeKeys = new Set();
+
+                        // Set up audio (deferred until user interaction)
+                        this.setupAudio();
+
+                        // Emulation state
+                        this.running = false;
+                        this.borderColor = 1; // Default border color (blue)
+                        this.frameCounter = 0;
+                        this.cpuCycles = 0;
+
+                        // Load ROM - this will be called separately
+                    }
+
+                    setupZ80() {
+                        // Create CPU instance from Z80.js
+                        this.cpu = new Z80({
+                            // Memory read function
+                            mem_read: (address) => {
+                                return this.readMemory(address);
+                            },
+
+                            // Memory write function
+                            mem_write: (address, value) => {
+                                this.writeMemory(address, value);
+                            },
+
+                            // I/O port read function
+                            io_read: (port) => {
+                                return this.readPort(port);
+                            },
+
+                            // I/O port write function
+                            io_write: (port, value) => {
+                                this.writePort(port, value);
+                            }
+                        });
+                    }
+
+                    async loadROM(romType = '48k') {
+                        document.getElementById('loading').style.display = 'block';
+                        document.getElementById('status-display').textContent = `Loading ROM: ${romType}...`;
+                        console.log(`Starting ROM load for ${romType}...`);
+
+                        try {
+                            // Store the current ROM type
+                            this.currentRom = romType;
+                            
+                            // Set the 128K model flag
+                            this.is128K = romType !== '48k';
+                            console.log(`Loading ${this.is128K ? '128K' : '48K'} model`);
+
+                            // Map ROM type to the corresponding path on GitHub
+                            const romMapping = {
+                                '48k': 'spectrum16-48/spec48.rom',  // Standard 48K ROM
+                                '128': 'spectrum128-plus2/128/spec128uk.rom', // 128K ROM
+                                'plus2': 'spectrum128-plus2/plus2/plus2uk.rom', // +2 ROM
+                                'plus3': 'spectrum-plus3/plus3/plus3.rom'  // +3 ROM
+                            };
+
+                            const romPath = romMapping[romType] || 'spectrum16-48/spec48.rom';
+                            // Use the jsDelivr CDN to access the actual binary content from GitHub
+                            const romUrl = `https://cdn.jsdelivr.net/gh/spectrumforeveryone/zx-roms@main/${romPath}`;
+
+                            console.log(`Attempting to load ROM from: ${romUrl}`);
+
+                            // Fetch the ROM file from GitHub
+                            const response = await fetch(romUrl, {
+                                method: 'GET',
+                                mode: 'cors',
+                                cache: 'no-cache'
+                            });
+
+                            if (!response.ok) {
+                                throw new Error(`Failed to load ROM: ${response.status} ${response.statusText}`);
+                            }
+
+                            const arrayBuffer = await response.arrayBuffer();
+                            console.log(`ROM file loaded, size: ${arrayBuffer.byteLength} bytes`);
+
+                            const romData = new Uint8Array(arrayBuffer);
+
+                            // Debug: Check ROM data
+                            if (romData.length === 0) {
+                                console.error('ROM data is empty');
+                                throw new Error('ROM data is empty');
+                            } else {
+                                const hexBytes = Array.from(romData.slice(0, 10), byte => byte.toString(16).padStart(2, '0')).join(' ');
+                                console.log(`First few bytes: ${hexBytes}`);
+                            }
+                            
+                            if (this.is128K) {
+                                // For 128K models, manage ROM differently
+                                console.log(`Handling ROM for 128K model: ${romType}`);
+                                
+                                // For 128K models, ROM can be up to 32K (two 16K ROMs)
+                                const maxRomSize = Math.min(romData.length, ROM_SIZE_128K);
+                                
+                                // Load the first 16K into ROM 0 (bank 0)
+                                for (let i = 0; i < ROM_SIZE; i++) {
+                                    if (i < romData.length) {
+                                        this.memory[i] = romData[i];
+                                    } else {
+                                        this.memory[i] = 0;
+                                    }
+                                }
+                                
+                                // If ROM is larger than 16K, we have a second ROM
+                                if (maxRomSize > ROM_SIZE) {
+                                    console.log('Loading second ROM bank');
+                                    // Store the second ROM in a special array for paging
+                                    for (let i = 0; i < ROM_SIZE; i++) {
+                                        const romIndex = ROM_SIZE + i;
+                                        if (romIndex < romData.length) {
+                                            // Store the second ROM for potential paging
+                                            this.memoryBanks[0][i] = romData[romIndex];
+                                        } else {
+                                            this.memoryBanks[0][i] = 0;
+                                        }
+                                    }
+                                }
+                                
+                                // Initialize memory banks
+                                for (let bank = 1; bank < 8; bank++) {
+                                    // Fill banks 1-7 with zeros initially
+                                    for (let i = 0; i < 16384; i++) {
+                                        this.memoryBanks[bank][i] = 0;
+                                    }
+                                }
+                                
+                                // Setup default memory configuration for 128K models
+                                // Bank 5 is paged in at 0xC000 by default
+                                this.ramBank = 0;
+                                this.screenSelection = 0;
+                                this.romSelection = 0;
+                                this.pagingEnabled = true;
+                                this.bankSwitchRegister = 0;
+                                
+                                // Copy initial RAM to banks 5 and 2
+                                for (let i = 0x8000; i < 0xC000; i++) {
+                                    this.memoryBanks[2][i - 0x8000] = 0;  // Bank 2 (usually at 0x8000)
+                                }
+                                
+                                // Initialize default screen area in bank 5
+                                for (let i = 0x4000; i < 0x8000; i++) {
+                                    this.memoryBanks[5][i - 0x4000] = (i >= 0x5800 && i < 0x5B00) ? 0x38 : 0;  // Bank 5 (often contains screen)
+                                }
+                                
+                                // Copy initial screen to main memory too
+                                for (let i = 0x4000; i < 0x8000; i++) {
+                                    this.memory[i] = (i >= 0x5800 && i < 0x5B00) ? 0x38 : 0;
+                                }
+                                
+                                console.log('Memory banks initialized for 128K model');
+                            } else {
+                                // For 48K model, simple ROM loading
+                                console.log('Loading ROM for 48K model');
+                                
+                                // Load ROM into memory (0x0000 - 0x3FFF)
+                                const romSize = Math.min(romData.length, ROM_SIZE);
+                                for (let i = 0; i < romSize; i++) {
+                                    this.memory[i] = romData[i];
+                                }
+                                
+                                // If ROM is smaller than 16K, fill the rest with zeros
+                                if (romSize < ROM_SIZE) {
+                                    console.log(`ROM size is ${romSize} bytes, filling the rest with zeros`);
+                                    for (let i = romSize; i < ROM_SIZE; i++) {
+                                        this.memory[i] = 0;
+                                    }
+                                }
+                            }
+                            
+                            // Clear the screen and reset system
+                            this.clearScreen();
+                            this.cpu.reset();
+                            
+                            console.log(`ROM successfully loaded: ${romType}`);
+                            document.getElementById('status-display').textContent = `ROM loaded: ${romType}. Ready to start.`;
+
+                            // Stop emulation if it was running to ensure a clean restart with the new ROM
+                            if (this.running) {
+                                this.stopEmulation();
+                                document.getElementById('start-button').textContent = 'Start';
+                            }
+
+                            // Return true to indicate success
+                            return true;
+                        } catch (error) {
+                            console.error('Error loading ROM:', error);
+                            document.getElementById('status-display').textContent = `Error loading ROM: ${error.message}`;
+
+                            // Throw the error again to propagate it to the caller
+                            throw error;
+                        } finally {
+                            document.getElementById('loading').style.display = 'none';
+                        }
+                    }
+
+                    clearScreen() {
+                        // Clear display file (0x4000-0x57FF)
+                        for (let i = DISPLAY_FILE_START; i <= DISPLAY_FILE_END; i++) {
+                            this.memory[i] = 0;
+                        }
+
+                        // Clear attributes (0x5800-0x5AFF)
+                        for (let i = ATTR_FILE_START; i <= ATTR_FILE_END; i++) {
+                            this.memory[i] = 0x38; // White on black
+                        }
+
+                        // Refresh display
+                        this.updateScreen();
+                    }
+
+                    startEmulation() {
+                        if (!this.running) {
+                            // Initialize audio after user interaction to comply with browser requirements
+                            this.initializeAudio();
+                            
+                            // Make sure the emulator has focus when starting
+                            this.focusEmulator();
+                            
+                            // Add a visual cue for the user to know keyboard input is active
+                            this.canvas.style.borderStyle = 'solid';
+                            
+                            // Start the emulator
+                            this.running = true;
+                            this.emulationLoop();
+                            document.getElementById('pause-button').textContent = 'Pause';
+                            document.getElementById('status-display').textContent = 'Emulator running - Keyboard input active';
+                            
+                            // Log a message about keyboard focus
+                            console.log('Emulator started with keyboard focus');
+                        }
+                    }
+
+                    stopEmulation() {
+                        this.running = false;
+                        document.getElementById('pause-button').textContent = 'Resume';
+                    }
+
+                    resetEmulation() {
+                        // Reset CPU to initial state
+                        this.cpu.reset();
+                        
+                        // Clear the screen
+                        this.clearScreen();
+                        
+                        // Reset border color to default (blue)
+                        this.borderColor = 1;
+
+                        // First stop the emulation
+                        this.stopEmulation();
+                        
+                        // Then restart it (this ensures a clean restart)
+                        this.startEmulation();
+                        
+                        document.getElementById('status-display').textContent = 'System reset';
+                    }
+
+                    emulationLoop() {
+                        if (!this.running) return;
+
+                        // Current time for frame timing
+                        const now = performance.now();
+                        
+                        // Initialize timing variables if needed
+                        if (!this.lastFrameTime) {
+                            this.lastFrameTime = now;
+                            this.frameCount = 0;
+                            this.fps = 0;
+                            this.lastRenderTime = 0;
+                        }
+
+                        // Update FPS counter once per second
+                        if (now - this.lastFrameTime >= 1000) {
+                            this.fps = this.frameCount;
+                            this.frameCount = 0;
+                            this.lastFrameTime = now;
+
+                            // Update FPS display if enabled
+                            if (document.getElementById('show-fps').checked) {
+                                document.getElementById('fps-counter').textContent = `${this.fps} FPS`;
+                            }
+                            
+                            // Log CPU PC every second for debugging
+                            if (this.cpu && this.cpu.pc !== undefined) {
+                                console.log(`Current CPU PC: 0x${this.cpu.pc.toString(16).padStart(4, '0')}`);
+                            }
+                        }
+                        
+                        // Frame rate control - check if fast forward is enabled
+                        const fastForward = document.getElementById('fast-forward').checked;
+                        
+                        // If fast forward is NOT enabled, cap at 50 FPS (normal speed)
+                        if (!fastForward) {
+                            const frameInterval = 20; // 50 FPS = 20ms per frame (ensures exactly 50 FPS)
+                            const elapsed = now - this.lastRenderTime;
+                            
+                            if (elapsed < frameInterval) {
+                                // Not enough time has passed yet, schedule next frame
+                                requestAnimationFrame(() => this.emulationLoop());
+                                return;
+                            }
+                            
+                            // Update last render time, accounting for any extra time
+                            this.lastRenderTime = now - (elapsed % frameInterval);
+                        } else {
+                            // Fast forward mode - run at full speed (uncapped)
+                            this.lastRenderTime = now;
+                        }
+
+                        // Execute a frame worth of Z80 instructions
+                        // ZX Spectrum runs at 3.5MHz, and a frame is 1/50th of a second
+                        // So we run approximately 70,000 cycles per frame
+                        this.runFrame();
+                        this.frameCount++;
+                        
+                        // Always update keyboard status display (for debugging)
+                        if (this.keyboardStatusElement) {
+                            // Only update every 5 frames to avoid performance impact
+                            if (this.frameCounter % 5 === 0) {
+                                this.updateKeyboardStatus();
+                            }
+                        }
+
+                        // Continue the loop
+                        requestAnimationFrame(() => this.emulationLoop());
+                    }
+
+                    runFrame() {
+                        // Run around 70,000 Z80 cycles (3.5MHz / 50Hz = 70,000)
+                        const targetCycles = 70000;
+                        let cycles = 0;
+
+                        while (cycles < targetCycles) {
+                            // Execute a single instruction and get cycles
+                            const instructionCycles = this.cpu.run_instruction();
+                            cycles += instructionCycles;
+                            this.cpuCycles += instructionCycles;
+
+                            // Handle interrupts every 1/50th of a second
+                            if (this.cpuCycles >= targetCycles) {
+                                this.cpuCycles -= targetCycles;
+                                this.generateInterrupt();
+                            }
+                        }
+
+                        // Update screen after frame is complete
+                        this.updateScreen();
+                        this.frameCounter++;
+                    }
+
+                    // Helper method to write characters to the screen (used by BASIC interpreter if needed)
+                    writeChar(x, y, pattern, attributeValue) {
+                        // Write a character to the screen at position (x,y)
+                        // x: 0-31 (character column)
+                        // y: 0-23 (character row)
+                        // pattern: array of 8 bytes representing the character bitmap
+                        // attributeValue: color attribute byte
+                        
+                        if (x >= 0 && x < 32 && y >= 0 && y < 24) {
+                            // Set the attribute byte for this character position (color information)
+                            const attrAddr = ATTR_FILE_START + (y * 32) + x;
+                            this.memory[attrAddr] = attributeValue;
+                            
+                            // Write the 8 rows of the character bitmap to display memory
+                            // Each row requires the complex ZX Spectrum screen address calculation
+                            for (let row = 0; row < 8; row++) {
+                                // Calculate actual Y coordinate (0-191)
+                                const pixel_y = (y * 8) + row;
+                                
+                                // Calculate address using ZX Spectrum memory layout formula
+                                const y_sector = (pixel_y & 0xC0) >> 6;      // Top 2 bits - which third of screen
+                                const y_character = (pixel_y & 0x38) >> 3;   // Middle 3 bits - character row within sector
+                                const y_line = pixel_y & 0x07;               // Bottom 3 bits - line within character
+                                
+                                // Assemble the pixel address
+                                const pixelAddr = 0x4000 | (y_sector << 11) | (y_line << 8) | (y_character << 5) | x;
+                                
+                                // Write the bitmap data for this row
+                                this.memory[pixelAddr] = pattern[row];
+                            }
+                        }
+                    }
+
+                    generateInterrupt() {
+                        // ZX Spectrum uses IM 1 (Interrupt Mode 1) by default
+                        // When interrupt occurs, CPU jumps to address 0x0038 in ROM
+                        
+                        // Only generate interrupt if:
+                        // 1. CPU has interrupts enabled (IFF1 flag)
+                        // 2. We're not in the middle of executing an instruction that disables interrupts
+                        if (this.cpu.iff1) {
+                            // Log every 50 frames (once per second) if interrupts are being generated
+                            if (this.frameCounter % 50 === 0) {
+                                if (this.cpu && this.cpu.pc !== undefined) {
+                                    console.log(`Generating interrupt at frame ${this.frameCounter}, CPU PC=0x${this.cpu.pc.toString(16).padStart(4, '0')}`);
+                                } else {
+                                    console.log(`Generating interrupt at frame ${this.frameCounter}, CPU PC not available`);
+                                }
+                                
+                                // Also log CPU registers for debugging
+                                this.logCPUState();
+                            }
+                            
+                            // Request interrupt on the CPU
+                            // In IM 1 mode, this will make CPU jump to address 0x0038
+                            this.cpu.interruptRequest();
+                        } else if (this.frameCounter % 50 === 0) {
+                            // Log if interrupts are disabled for too long
+                            if (this.cpu && this.cpu.pc !== undefined) {
+                                console.log(`WARNING: Interrupts disabled at frame ${this.frameCounter}, CPU PC=0x${this.cpu.pc.toString(16).padStart(4, '0')}`);
+                            } else {
+                                console.log(`WARNING: Interrupts disabled at frame ${this.frameCounter}, CPU PC not available`);
+                            }
+                        }
+                    }
+                    
+                    // Add a debug method to log the CPU state for diagnostics
+                    logCPUState() {
+                        const cpu = this.cpu;
+                        if (!cpu) {
+                            console.log('CPU not initialized');
+                            return;
+                        }
+                        
+                        console.log('------- CPU STATE -------');
+                        console.log(`PC: 0x${(cpu.pc || 0).toString(16).padStart(4, '0')}`);
+                        console.log(`SP: 0x${(cpu.sp || 0).toString(16).padStart(4, '0')}`);
+                        
+                        // Check for undefined values to prevent errors
+                        const a = cpu.a !== undefined ? cpu.a : 0;
+                        const f = cpu.f !== undefined ? cpu.f : 0;
+                        const b = cpu.b !== undefined ? cpu.b : 0;
+                        const c = cpu.c !== undefined ? cpu.c : 0;
+                        const d = cpu.d !== undefined ? cpu.d : 0;
+                        const e = cpu.e !== undefined ? cpu.e : 0;
+                        const h = cpu.h !== undefined ? cpu.h : 0;
+                        const l = cpu.l !== undefined ? cpu.l : 0;
+                        const ix = cpu.ix !== undefined ? cpu.ix : 0;
+                        const iy = cpu.iy !== undefined ? cpu.iy : 0;
+                        
+                        console.log(`AF: 0x${a.toString(16).padStart(2, '0')}${f.toString(16).padStart(2, '0')}`);
+                        console.log(`BC: 0x${b.toString(16).padStart(2, '0')}${c.toString(16).padStart(2, '0')}`);
+                        console.log(`DE: 0x${d.toString(16).padStart(2, '0')}${e.toString(16).padStart(2, '0')}`);
+                        console.log(`HL: 0x${h.toString(16).padStart(2, '0')}${l.toString(16).padStart(2, '0')}`);
+                        console.log(`IX: 0x${ix.toString(16).padStart(4, '0')}`);
+                        console.log(`IY: 0x${iy.toString(16).padStart(4, '0')}`);
+                        console.log(`IFF1: ${cpu.iff1 !== undefined ? cpu.iff1 : 'N/A'}, IFF2: ${cpu.iff2 !== undefined ? cpu.iff2 : 'N/A'}`);
+                        console.log(`IM: ${cpu.im !== undefined ? cpu.im : 'N/A'}`);
+                        console.log('------------------------');
+                    }
+
+                    readMemory(address) {
+                        address &= 0xFFFF;
+                        
+                        // For 48K model, simple memory access
+                        if (!this.is128K) {
+                            return this.memory[address];
+                        }
+                        
+                        // For 128K models, implement memory paging
+                        if (address < 0x4000) {
+                            // ROM area (0x0000-0x3FFF)
+                            // If ROM 1 is selected and paging is enabled, return from alternate ROM
+                            if (this.romSelection === 1 && this.pagingEnabled) {
+                                return this.memoryBanks[0][address]; // ROM 1
+                            } else {
+                                return this.memory[address]; // ROM 0
+                            }
+                        } else if (address < 0x8000) {
+                            // Screen area (0x4000-0x7FFF)
+                            // The 128K models have two screen buffers - 5 (normal) and 7 (shadow)
+                            if (this.screenSelection === 1 && this.pagingEnabled) {
+                                return this.memoryBanks[7][address - 0x4000]; // Shadow screen in bank 7
+                            } else {
+                                return this.memory[address]; // Normal screen
+                            }
+                        } else if (address < 0xC000) {
+                            // Middle 16K (0x8000-0xBFFF)
+                            // Always bank 2 in 128K models
+                            return this.memoryBanks[2][address - 0x8000];
+                        } else {
+                            // Top 16K (0xC000-0xFFFF)
+                            // Paged RAM bank (0-7)
+                            return this.memoryBanks[this.ramBank][address - 0xC000];
+                        }
+                    }
+
+                    writeMemory(address, value) {
+                        address &= 0xFFFF;
+                        value &= 0xFF;
+
+                        // For 48K model
+                        if (!this.is128K) {
+                            // ROM is read-only (0x0000 - 0x3FFF)
+                            if (address < ROM_SIZE) {
+                                return;
+                            }
+                            
+                            // Write to RAM
+                            this.memory[address] = value;
+                            return;
+                        }
+                        
+                        // For 128K models with memory paging
+                        if (address < 0x4000) {
+                            // ROM area is read-only
+                            return;
+                        } else if (address < 0x8000) {
+                            // Screen area (0x4000-0x7FFF)
+                            if (this.screenSelection === 1 && this.pagingEnabled) {
+                                // Write to shadow screen (bank 7)
+                                this.memoryBanks[7][address - 0x4000] = value;
+                            } else {
+                                // Write to normal screen (bank 5, copied to main memory)
+                                this.memory[address] = value;
+                                // Also write to bank 5 for consistency
+                                this.memoryBanks[5][address - 0x4000] = value;
+                            }
+                        } else if (address < 0xC000) {
+                            // Middle 16K (0x8000-0xBFFF)
+                            // Always bank 2 in 128K models
+                            this.memoryBanks[2][address - 0x8000] = value;
+                        } else {
+                            // Top 16K (0xC000-0xFFFF)
+                            // Paged RAM bank (0-7)
+                            this.memoryBanks[this.ramBank][address - 0xC000] = value;
+                        }
+                    }
+
+                    readPort(port) {
+                        port &= 0xFFFF;
+                        
+                        // Handle keyboard input (port 0xFE)
+                        if ((port & 0xFF) === 0xFE) {
+                            const highByte = (port >> 8) & 0xFF;
+                            return this.readKeyboard(highByte);
+                        }
+                        
+                        // Memory bank switching port (0x7FFD) - 128K models
+                        if (this.is128K && (port & 0xFF) === 0xFD && (port & 0x8000) === 0) {
+                            // Return the current bank switch register value if enabled
+                            if (this.pagingEnabled) {
+                                console.log(`Reading bank switch register: 0x${this.bankSwitchRegister.toString(16)}`);
+                                return this.bankSwitchRegister;
+                            }
+                        }
+                        
+                        // AY sound chip register/data ports (for 128K models)
+                        if (this.is128K && (port & 0xFF) === 0xFD) {
+                            if ((port & 0xC000) === 0xC000) {
+                                // Reading from AY register data (not implemented)
+                                console.log('Reading from AY register data (not implemented)');
+                                return 0xFF;
+                            }
+                        }
+                        
+                        // Get any previously written value for this port
+                        const value = this.ports.get(port);
+                        return value !== undefined ? value : 0xFF;
+                    }
+
+                    writePort(port, value) {
+                        port &= 0xFFFF;
+                        value &= 0xFF;
+
+                        // ULA port (0xFE)
+                        if ((port & 0xFF) === 0xFE) {
+                            // Bits 0-2: Border color
+                            this.borderColor = value & 0x07;
+
+                            // Bit 4: EAR output (beeper)
+                            this.updateBeeper(value & 0x10);
+                        }
+                        
+                        // Memory paging port (0x7FFD) for 128K models
+                        if (this.is128K && (port & 0xFF) === 0xFD && (port & 0x8000) === 0) {
+                            // Only process if paging is still enabled
+                            if (this.pagingEnabled) {
+                                console.log(`Memory banking port write: 0x${port.toString(16)} = 0x${value.toString(16)}`);
+                                
+                                // Store the value
+                                this.bankSwitchRegister = value;
+                                
+                                // Bits 0-2: RAM bank (0-7) to map to 0xC000-0xFFFF
+                                const newRamBank = value & 0x07;
+                                if (newRamBank !== this.ramBank) {
+                                    this.ramBank = newRamBank;
+                                    console.log(`RAM bank switched to ${this.ramBank}`);
+                                }
+                                
+                                // Bit 3: Select normal screen (0) or shadow screen (1)
+                                const newScreenSelection = (value & 0x08) !== 0 ? 1 : 0;
+                                if (newScreenSelection !== this.screenSelection) {
+                                    this.screenSelection = newScreenSelection;
+                                    console.log(`Screen selection changed to ${this.screenSelection ? 'shadow' : 'normal'}`);
+                                }
+                                
+                                // Bit 4: ROM select (0 = ROM 0, 1 = ROM 1)
+                                const newRomSelection = (value & 0x10) !== 0 ? 1 : 0;
+                                if (newRomSelection !== this.romSelection) {
+                                    this.romSelection = newRomSelection;
+                                    console.log(`ROM selection changed to ROM ${this.romSelection}`);
+                                }
+                                
+                                // Bit 5: Paging disable (write once, 1 = disable until reset)
+                                if ((value & 0x20) !== 0) {
+                                    this.pagingEnabled = false;
+                                    console.log('Memory paging disabled until reset');
+                                }
+                                
+                                // Debug output of memory configuration
+                                console.log(`Memory config: ROM ${this.romSelection}, Screen ${this.screenSelection}, RAM bank ${this.ramBank}, Paging ${this.pagingEnabled ? 'enabled' : 'disabled'}`);
+                            } else {
+                                console.log('Ignored memory paging request - paging is disabled');
+                            }
+                        }
+                        
+                        // AY sound chip registers (not implemented yet)
+                        if (this.is128K && (port & 0xFF) === 0xFD && (port & 0x8000) !== 0) {
+                            // This would be the AY sound chip register select port (0xFFFD)
+                            console.log(`AY register select: ${value}`);
+                        }
+                        
+                        if (this.is128K && (port & 0xFF) === 0xFD && (port & 0x4000) !== 0) {
+                            // This would be the AY sound chip data port (0xBFFD)
+                            console.log(`AY data write: ${value}`);
+                        }
+
+                        // Store port value for future reference
+                        this.ports.set(port, value);
+                    }
+
+                    readKeyboard(highByte) {
+                        // ZX Spectrum keyboard reading through port 0xFE
+                        // The high byte selects keyboard half-rows via address lines A8-A15
+                        // When a bit in the high byte is 0, that row is selected for reading
+                        
+                        let result = 0xFF; // Default: no keys pressed (all bits set)
+                        
+                        // Check each keyboard row (8 rows total)
+                        for (let row = 0; row < 8; row++) {
+                            // If this row is selected (bit is 0 in high byte)
+                            if ((highByte & (1 << row)) === 0) {
+                                // Read state of keys in this row
+                                // The keyboardMatrix stores which keys are pressed (0=pressed, 1=not pressed)
+                                result &= this.keyboardMatrix[row];
+                            }
+                        }
+                        
+                        // Debug keyboard reads to help diagnose issues
+                        if (result !== 0xFF && this.frameCounter % 50 === 0) {
+                            console.log(`Keyboard read - Address: ${highByte.toString(16)}, Result: ${result.toString(16)}`);
+                        }
+                        
+                        return result;
+                    }
+
+                    setupAudio() {
+                        // Defer actual audio setup until user interaction
+                        this.audioInitialized = false;
+                        this.audioContext = null;
+                        this.oscillator = null;
+                        this.gainNode = null;
+                        console.log("Audio initialization deferred until user interaction");
+                    }
+                    
+                    initializeAudio() {
+                        // Only initialize once
+                        if (this.audioInitialized) return;
+                        
+                        try {
+                            // Create audio context after user interaction
+                            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                            
+                            // Create oscillator for beeper
+                            this.oscillator = this.audioContext.createOscillator();
+                            this.oscillator.type = 'square';
+                            this.oscillator.frequency.setValueAtTime(440, this.audioContext.currentTime);
+                            
+                            // Create gain node to control volume
+                            this.gainNode = this.audioContext.createGain();
+                            this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime); // Start with zero volume
+                            
+                            // Connect nodes
+                            this.oscillator.connect(this.gainNode);
+                            this.gainNode.connect(this.audioContext.destination);
+                            
+                            // Start oscillator
+                            this.oscillator.start();
+                            
+                            this.audioInitialized = true;
+                            console.log("Audio successfully initialized after user interaction");
+                        } catch (error) {
+                            console.error("Audio initialization failed:", error);
+                        }
+                    }
+
+                    updateBeeper(value) {
+                        // Update beeper based on bit 4 of port 0xFE
+                        if (!this.audioInitialized || !this.audioContext) {
+                            // Audio not yet initialized, which is normal before first user interaction
+                            return;
+                        }
+
+                        // Check if sound is enabled via UI
+                        const soundEnabled = document.getElementById('enable-sound').checked;
+                        if (!soundEnabled) {
+                            // If sound is disabled in UI, ensure the gain is set to 0
+                            if (this.gainNode) {
+                                this.gainNode.gain.cancelScheduledValues(this.audioContext.currentTime);
+                                this.gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+                            }
+                            return;
+                        }
+
+                        try {
+                            // Resume audio context if it was suspended
+                            if (this.audioContext.state === 'suspended') {
+                                this.audioContext.resume().then(() => {
+                                    console.log("AudioContext resumed successfully");
+                                }).catch(err => {
+                                    console.error("Failed to resume AudioContext:", err);
+                                });
+                            }
+
+                            // The beeper value is in bit 4 (0x10) of port 0xFE
+                            // Set gain to a non-zero value when bit is set, and zero when cleared
+                            // We use a small transition time to avoid clicks
+                            const currentTime = this.audioContext.currentTime;
+                            const transitionTime = 0.002; // 2ms transition to avoid clicks
+
+                            // Cancel any previously scheduled values
+                            this.gainNode.gain.cancelScheduledValues(currentTime);
+                            
+                            if (value) {
+                                // Bit is set, so turn on the beeper (audible sound)
+                                this.gainNode.gain.setValueAtTime(0.15, currentTime);
+                                
+                                // Also set the frequency to produce the typical ZX Spectrum beep sound
+                                this.oscillator.frequency.setValueAtTime(800, currentTime);
+                            } else {
+                                // Bit is clear, so turn off the beeper (silent)
+                                this.gainNode.gain.setValueAtTime(0, currentTime);
+                            }
+                            
+                        } catch (error) {
+                            console.error("Beeper update failed:", error);
+                        }
+                    }
+
+                    updateScreen() {
+                        // Get the image data for the canvas
+                        const imageData = this.imageData;
+                        const data = imageData.data;
+                        
+                        // Clear the image data with black
+                        data.fill(0);
+                        
+                        /*
+                        * ZX Spectrum screen memory layout is non-linear and divided into three sections:
+                        * 1. Pixel data: 0x4000-0x57FF (6144 bytes)
+                        * 2. Attribute data: 0x5800-0x5AFF (768 bytes)
+                        * 3. System variables: 0x5B00-0x5BFF (not used for display)
+                        *
+                        * The screen is 256x192 pixels, organized as 32 columns x 24 rows of 8x8 character cells
+                        * Each byte in pixel data represents 8 horizontal pixels (1 bit per pixel)
+                        * Each character cell (8x8 pixels) has a corresponding attribute byte that defines colors
+                        *
+                        * For 128K models, there are two screens:
+                        * - Main screen at 0x4000 (in bank 5 when paged)
+                        * - Shadow screen at 0x4000 in bank 7
+                        */
+                       
+                        // Process the entire 256x192 pixel screen
+                        for (let y = 0; y < 192; y++) {
+                            // Calculate pixel address using ZX Spectrum memory mapping formula
+                            // Formula details:
+                            // - Y coordinate bits are scattered in address for optimization of Z80 addressing modes
+                            // - Base address: 0x4000 
+                            // - Y coordinate (0-191) maps to specific bit patterns in the address
+                            
+                            // Get the Y coordinate parts for address calculation
+                            const y_sector = (y & 0xC0) >> 6;      // Top 2 bits (0, 1, or 2) - which third of the screen
+                            const y_character = (y & 0x38) >> 3;   // Middle 3 bits (0-7) - which character row within sector
+                            const y_line = y & 0x07;               // Bottom 3 bits (0-7) - which line within character
+                            
+                            // Calculate pixel row base address:
+                            // 0x4000 (base) + y_sector * 0x800 + y_line * 0x100 + y_character * 0x20
+                            const row_base = 0x4000 | (y_sector << 11) | (y_line << 8) | (y_character << 5);
+                            
+                            // Process each character position horizontally (32 columns)
+                            for (let x_char = 0; x_char < 32; x_char++) {
+                                // For shadow screen (128K models), use memory from bank 7
+                                let pixelByte, attr;
+                                
+                                if (this.is128K && this.screenSelection === 1 && this.pagingEnabled) {
+                                    // Using shadow screen (bank 7)
+                                    // Calculate pixel address
+                                    const pixelOffset = (row_base - 0x4000) + x_char;
+                                    pixelByte = this.memoryBanks[7][pixelOffset];
+                                    
+                                    // Calculate attribute address in shadow screen
+                                    const attrOffset = 0x1800 + ((y >> 3) * 32) + x_char; // 0x1800 = 0x5800 - 0x4000
+                                    attr = this.memoryBanks[7][attrOffset];
+                                } else {
+                                    // Using normal screen (main memory or bank 5)
+                                    // Calculate attribute address (color information)
+                                    // Attribute memory starts at 0x5800 and is arranged linearly as 32x24 bytes
+                                    const attr_addr = 0x5800 + ((y >> 3) * 32) + x_char;
+                                    attr = this.memory[attr_addr];
+                                    
+                                    // Get the byte that represents 8 horizontal pixels
+                                    const pixelAddr = row_base + x_char;
+                                    pixelByte = this.memory[pixelAddr];
+                                }
+                                
+                                // Extract color attributes
+                                const ink = attr & 0x07;                // Bits 0-2: Ink color (0-7)
+                                const paper = (attr >> 3) & 0x07;       // Bits 3-5: Paper color (0-7)
+                                const bright = (attr & 0x40) !== 0;     // Bit 6: Brightness
+                                const flash = (attr & 0x80) !== 0;      // Bit 7: Flash
+                                
+                                // Handle flashing (invert colors every 16 frames)
+                                const flashActive = flash && (this.frameCounter & 0x10) !== 0;
+                                
+                                // Process 8 pixels within the byte
+                                for (let bit = 0; bit < 8; bit++) {
+                                    // Calculate pixel position on screen
+                                    const x = (x_char * 8) + bit;
+                                    
+                                    // Check if pixel is set (bit order is MSB first)
+                                    const pixelOn = (pixelByte & (0x80 >> bit)) !== 0;
+                                    
+                                    // Apply flash by inverting the pixel value if needed
+                                    const pixelValue = flashActive ? !pixelOn : pixelOn;
+                                    
+                                    // Determine color index based on pixel value
+                                    const colorIndex = (pixelValue ? ink : paper) + (bright ? 8 : 0);
+                                    
+                                    // Get RGB values for the color
+                                    const [r, g, b] = COLORS[colorIndex];
+                                    
+                                    // Calculate position in the canvas image data (RGBA format)
+                                    const pos = ((y * 256) + x) * 4;
+                                    
+                                    // Set pixel color
+                                    data[pos] = r;        // Red
+                                    data[pos + 1] = g;    // Green
+                                    data[pos + 2] = b;    // Blue
+                                    data[pos + 3] = 255;  // Alpha (fully opaque)
+                                }
+                            }
+                        }
+                        
+                        // Draw the image to the canvas
+                        this.ctx.putImageData(imageData, 0, 0);
+                        
+                        // Update border color (using CSS border)
+                        const borderRGB = COLORS[this.borderColor];
+                        this.canvas.style.borderColor = `rgb(${borderRGB[0]}, ${borderRGB[1]}, ${borderRGB[2]})`;
+                        
+                        // Update the status display every 50 frames (approximately once per second)
+                        if (this.frameCounter % 50 === 0) {
+                            const statusEl = document.getElementById('status-display');
+                            if (statusEl) {
+                                statusEl.textContent = `Running, frames: ${this.frameCounter}, ROM: ${this.currentRom || '48k'}`;
+                            }
+                        }
+                    }
+
+                    setupKeyboard() {
+                        // Reset the keyboard matrix (0xFF means no keys pressed)
+                        this.keyboardMatrix = new Array(8).fill(0xFF);
+                        
+                        // Active keys for debugging display
+                        this.activeKeys = new Set();
+                        
+                        // Attach keyboard listeners to the window (global) to ensure they're always captured
+                        window.addEventListener('keydown', (event) => {
+                            this.handleKeyEvent(event, true);
+                        });
+
+                        window.addEventListener('keyup', (event) => {
+                            this.handleKeyEvent(event, false);
+                        });
+                        
+                        // Make the canvas focusable and add focus handling
+                        this.canvas.setAttribute('tabindex', '0');
+                        this.canvas.style.outline = 'none'; // Remove outline when focused
+                        
+                        // Add click handler to ensure canvas gets focus
+                        this.canvas.addEventListener('click', () => {
+                            this.focusEmulator();
+                        });
+                        
+                        // Create keyboard status display
+                        this.keyboardStatusElement = document.createElement('div');
+                        this.keyboardStatusElement.id = 'keyboard-status';
+                        this.keyboardStatusElement.style.fontFamily = 'monospace';
+                        this.keyboardStatusElement.style.fontSize = '12px';
+                        this.keyboardStatusElement.style.marginTop = '10px';
+                        this.keyboardStatusElement.style.padding = '5px';
+                        this.keyboardStatusElement.style.backgroundColor = '#f0f0f0';
+                        this.keyboardStatusElement.style.border = '1px solid #ddd';
+                        this.keyboardStatusElement.style.borderRadius = '4px';
+                        this.keyboardStatusElement.style.display = 'none'; // Initially hidden
+                        
+                        // We no longer need to add it to the document as we're now using a pre-defined element
+                        // The keyboard status element is already in the HTML
+                        
+                        // Add checkbox to show/hide keyboard status
+                        const showKeyboardCheckbox = document.getElementById('show-keyboard-status');
+                        if (showKeyboardCheckbox) {
+                            showKeyboardCheckbox.addEventListener('change', (e) => {
+                                this.keyboardStatusElement.style.display = e.target.checked ? 'block' : 'none';
+                            });
+                        }
+                        
+                        // Add focus/blur indicators for better visual feedback
+                        this.canvas.addEventListener('focus', () => {
+                            this.canvas.style.borderStyle = 'solid';
+                            this.canvas.style.borderColor = 'yellow';
+                            console.log('Emulator focused - keyboard input active');
+                            
+                            // Update status
+                            const statusEl = document.getElementById('status-display');
+                            if (statusEl) {
+                                const currentStatus = statusEl.textContent || '';
+                                if (!currentStatus.includes('Keyboard active')) {
+                                    statusEl.textContent = currentStatus + ' - Keyboard active';
+                                }
+                            }
+                        });
+                        
+                        this.canvas.addEventListener('blur', () => {
+                            this.canvas.style.borderStyle = 'dashed';
+                            this.canvas.style.borderColor = COLORS[this.borderColor];
+                            console.log('Emulator lost focus - keyboard input inactive');
+                            
+                            // Update status
+                            const statusEl = document.getElementById('status-display');
+                            if (statusEl) {
+                                const currentStatus = statusEl.textContent || '';
+                                statusEl.textContent = currentStatus.replace(' - Keyboard active', '');
+                            }
+                        });
+                        
+                        // Initial keyboard status update
+                        this.updateKeyboardStatus();
+                        
+                        console.log("Enhanced keyboard event handlers initialized");
+                    }
+                    
+                    focusEmulator() {
+                        // Focus the canvas to capture keyboard events
+                        this.canvas.focus();
+                        
+                        // Add a visual indicator that the canvas has focus (a solid border)
+                        // This helps debug keyboard input issues
+                        this.canvas.style.borderStyle = 'solid';
+                        this.canvas.style.borderWidth = '2px';
+                        
+                        console.log("Canvas focused for keyboard input");
+                        
+                        // Make sure the document.activeElement is the canvas
+                        if (document.activeElement !== this.canvas) {
+                            console.warn("Canvas could not get focus! Active element is:", document.activeElement);
+                        }
+                    }
+
+                    // Direct, more reliable keyboard handling
+                    handleKeyEvent(event, isKeyDown) {
+                        // Get key information for debugging
+                        const key = event.key.toLowerCase();
+                        const code = event.code; // Using event.code is more reliable for key position
+                        
+                        // Add extensive debugging information for keyboard events
+                        if (isKeyDown) {
+                            console.log(`Key DOWN: ${key} (${code}), keyCode=${event.keyCode}`);
+                            this.activeKeys.add(code);
+                        } else {
+                            console.log(`Key UP: ${key} (${code}), keyCode=${event.keyCode}`);
+                            this.activeKeys.delete(code);
+                        }
+                        
+                        // Process using code which is more reliable than key
+                        // This maps physical key positions to ZX Spectrum keyboard matrix
+                        
+                        // The ZX Spectrum keyboard matrix:
+                        // Row 0: SHIFT(CAPS), Z, X, C, V
+                        // Row 1: A, S, D, F, G
+                        // Row 2: Q, W, E, R, T
+                        // Row 3: 1, 2, 3, 4, 5
+                        // Row 4: 0, 9, 8, 7, 6
+                        // Row 5: P, O, I, U, Y
+                        // Row 6: ENTER, L, K, J, H
+                        // Row 7: SPACE, SYMBOL SHIFT, M, N, B
+                        
+                        // Direct keyboard matrix mapping using event.code (physical key position)
+                        let row = -1;
+                        let bit = -1;
+                        let shiftNeeded = false;
+                        let symbolShiftNeeded = false;
+                        
+                        // Map each physical key to the Spectrum keyboard matrix
+                        switch(code) {
+                            // Row 0
+                            case 'ShiftLeft':
+                            case 'ShiftRight':
+                                row = 0; bit = 0; break;
+                            case 'KeyZ':
+                                row = 0; bit = 1; break;
+                            case 'KeyX':
+                                row = 0; bit = 2; break;
+                            case 'KeyC':
+                                row = 0; bit = 3; break;
+                            case 'KeyV':
+                                row = 0; bit = 4; break;
+                                
+                            // Row 1
+                            case 'KeyA':
+                                row = 1; bit = 0; break;
+                            case 'KeyS':
+                                row = 1; bit = 1; break;
+                            case 'KeyD':
+                                row = 1; bit = 2; break;
+                            case 'KeyF':
+                                row = 1; bit = 3; break;
+                            case 'KeyG':
+                                row = 1; bit = 4; break;
+                                
+                            // Row 2
+                            case 'KeyQ':
+                                row = 2; bit = 0; break;
+                            case 'KeyW':
+                                row = 2; bit = 1; break;
+                            case 'KeyE':
+                                row = 2; bit = 2; break;
+                            case 'KeyR':
+                                row = 2; bit = 3; break;
+                            case 'KeyT':
+                                row = 2; bit = 4; break;
+                                
+                            // Row 3
+                            case 'Digit1':
+                                row = 3; bit = 0; break;
+                            case 'Digit2':
+                                row = 3; bit = 1; break;
+                            case 'Digit3':
+                                row = 3; bit = 2; break;
+                            case 'Digit4':
+                                row = 3; bit = 3; break;
+                            case 'Digit5':
+                                row = 3; bit = 4; break;
+                                
+                            // Row 4
+                            case 'Digit0':
+                                row = 4; bit = 0; break;
+                            case 'Digit9':
+                                row = 4; bit = 1; break;
+                            case 'Digit8':
+                                row = 4; bit = 2; break;
+                            case 'Digit7':
+                                row = 4; bit = 3; break;
+                            case 'Digit6':
+                                row = 4; bit = 4; break;
+                                
+                            // Row 5
+                            case 'KeyP':
+                                row = 5; bit = 0; break;
+                            case 'KeyO':
+                                row = 5; bit = 1; break;
+                            case 'KeyI':
+                                row = 5; bit = 2; break;
+                            case 'KeyU':
+                                row = 5; bit = 3; break;
+                            case 'KeyY':
+                                row = 5; bit = 4; break;
+                                
+                            // Row 6
+                            case 'Enter':
+                                row = 6; bit = 0; break;
+                            case 'KeyL':
+                                row = 6; bit = 1; break;
+                            case 'KeyK':
+                                row = 6; bit = 2; break;
+                            case 'KeyJ':
+                                row = 6; bit = 3; break;
+                            case 'KeyH':
+                                row = 6; bit = 4; break;
+                                
+                            // Row 7
+                            case 'Space':
+                                row = 7; bit = 0; break;
+                            case 'ControlLeft':
+                            case 'ControlRight':
+                            case 'AltLeft':      // Allow Alt as Symbol Shift too
+                            case 'AltRight':
+                                row = 7; bit = 1; break;  // Symbol Shift
+                            case 'KeyM':
+                                row = 7; bit = 2; break;
+                            case 'KeyN':
+                                row = 7; bit = 3; break;
+                            case 'KeyB':
+                                row = 7; bit = 4; break;
+                                
+                            // Special keys that need key combinations
+                            case 'Backspace':    // Backspace = SHIFT + 0
+                                // First key is SHIFT (row 0, bit 0)
+                                // Second key is 0 (row 4, bit 0)
+                                if (isKeyDown) {
+                                    this.keyboardMatrix[0] &= ~(1 << 0);  // Press SHIFT
+                                    this.keyboardMatrix[4] &= ~(1 << 0);  // Press 0
+                                } else {
+                                    this.keyboardMatrix[0] |= (1 << 0);   // Release SHIFT
+                                    this.keyboardMatrix[4] |= (1 << 0);   // Release 0
+                                }
+                                event.preventDefault();
+                                this.updateKeyboardStatus();
+                                return;
+                                
+                            case 'ArrowLeft':    // Left = SHIFT + 5
+                                if (isKeyDown) {
+                                    this.keyboardMatrix[0] &= ~(1 << 0);  // Press SHIFT
+                                    this.keyboardMatrix[3] &= ~(1 << 4);  // Press 5
+                                } else {
+                                    this.keyboardMatrix[0] |= (1 << 0);   // Release SHIFT
+                                    this.keyboardMatrix[3] |= (1 << 4);   // Release 5
+                                }
+                                event.preventDefault();
+                                this.updateKeyboardStatus();
+                                return;
+                                
+                            case 'ArrowDown':    // Down = SHIFT + 6
+                                if (isKeyDown) {
+                                    this.keyboardMatrix[0] &= ~(1 << 0);  // Press SHIFT
+                                    this.keyboardMatrix[4] &= ~(1 << 4);  // Press 6
+                                } else {
+                                    this.keyboardMatrix[0] |= (1 << 0);   // Release SHIFT
+                                    this.keyboardMatrix[4] |= (1 << 4);   // Release 6
+                                }
+                                event.preventDefault();
+                                this.updateKeyboardStatus();
+                                return;
+                                
+                            case 'ArrowUp':      // Up = SHIFT + 7
+                                if (isKeyDown) {
+                                    this.keyboardMatrix[0] &= ~(1 << 0);  // Press SHIFT
+                                    this.keyboardMatrix[4] &= ~(1 << 3);  // Press 7
+                                } else {
+                                    this.keyboardMatrix[0] |= (1 << 0);   // Release SHIFT
+                                    this.keyboardMatrix[4] |= (1 << 3);   // Release 7
+                                }
+                                event.preventDefault();
+                                this.updateKeyboardStatus();
+                                return;
+                                
+                            case 'ArrowRight':   // Right = SHIFT + 8
+                                if (isKeyDown) {
+                                    this.keyboardMatrix[0] &= ~(1 << 0);  // Press SHIFT
+                                    this.keyboardMatrix[4] &= ~(1 << 2);  // Press 8
+                                } else {
+                                    this.keyboardMatrix[0] |= (1 << 0);   // Release SHIFT
+                                    this.keyboardMatrix[4] |= (1 << 2);   // Release 8
+                                }
+                                event.preventDefault();
+                                this.updateKeyboardStatus();
+                                return;
+                                
+                            default:
+                                // Check for punctuation keys
+                                if (key === '.') {
+                                    if (isKeyDown) {
+                                        this.keyboardMatrix[7] &= ~(1 << 1); // Press Symbol Shift
+                                        this.keyboardMatrix[7] &= ~(1 << 2); // Press M
+                                    } else {
+                                        this.keyboardMatrix[7] |= (1 << 1);  // Release Symbol Shift
+                                        this.keyboardMatrix[7] |= (1 << 2);  // Release M
+                                    }
+                                    event.preventDefault();
+                                    this.updateKeyboardStatus();
+                                    return;
+                                } else if (key === ',') {
+                                    if (isKeyDown) {
+                                        this.keyboardMatrix[7] &= ~(1 << 1); // Press Symbol Shift
+                                        this.keyboardMatrix[7] &= ~(1 << 3); // Press N
+                                    } else {
+                                        this.keyboardMatrix[7] |= (1 << 1);  // Release Symbol Shift
+                                        this.keyboardMatrix[7] |= (1 << 3);  // Release N
+                                    }
+                                    event.preventDefault();
+                                    this.updateKeyboardStatus();
+                                    return;
+                                }
+                                break;
+                        }
+                        
+                        // Process regular keys (where row/bit was set)
+                        if (row >= 0 && bit >= 0) {
+                            if (isKeyDown) {
+                                // Clear the bit (0 = pressed)
+                                this.keyboardMatrix[row] &= ~(1 << bit);
+                                console.log(`Set key: row ${row}, bit ${bit} -> ${this.keyboardMatrix[row].toString(16)}`);
+                            } else {
+                                // Set the bit (1 = not pressed)
+                                this.keyboardMatrix[row] |= (1 << bit);
+                                console.log(`Clear key: row ${row}, bit ${bit} -> ${this.keyboardMatrix[row].toString(16)}`);
+                            }
+                            
+                            // Prevent default browser actions for these keys
+                            event.preventDefault();
+                            
+                            // Update the debug display
+                            this.updateKeyboardStatus();
+                        }
+                    }
+                    
+                    // New method to display current keyboard state
+                    updateKeyboardStatus() {
+                        if (!this.keyboardStatusElement) return;
+                        
+                        // Create a visual representation of the keyboard matrix
+                        let status = '<strong>ZX Spectrum Keyboard Status:</strong><br>';
+                        status += '<span style="color:#888">0 = key pressed, 1 = key not pressed</span><br>';
+                        
+                        const rowLabels = [
+                            'Row 0 (SHIFT,Z,X,C,V): ',
+                            'Row 1 (A,S,D,F,G): ',
+                            'Row 2 (Q,W,E,R,T): ',
+                            'Row 3 (1,2,3,4,5): ',
+                            'Row 4 (0,9,8,7,6): ',
+                            'Row 5 (P,O,I,U,Y): ',
+                            'Row 6 (ENT,L,K,J,H): ',
+                            'Row 7 (SPC,SYM,M,N,B): '
+                        ];
+                        
+                        // Show each row with its binary representation
+                        for (let row = 0; row < 8; row++) {
+                            const bits = this.keyboardMatrix[row].toString(2).padStart(8, '0');
+                            const relevantBits = bits.slice(3); // Show only the 5 relevant bits
+                            
+                            status += rowLabels[row];
+                            
+                            // Highlight active (pressed) keys in the binary pattern
+                            let coloredBits = '';
+                            for (let i = 0; i < relevantBits.length; i++) {
+                                const bit = relevantBits[i];
+                                if (bit === '0') {
+                                    // Key is pressed (bit = 0)
+                                    coloredBits += `<span style="color:red;font-weight:bold">${bit}</span>`;
+                                } else {
+                                    coloredBits += bit;
+                                }
+                            }
+                            
+                            status += coloredBits + '<br>';
+                        }
+                        
+                        // Show currently active keys
+                        status += '<br><strong>Active Keys:</strong> ';
+                        if (this.activeKeys.size > 0) {
+                            status += Array.from(this.activeKeys).join(', ');
+                        } else {
+                            status += '<span style="color:#888">None</span>';
+                        }
+                        
+                        // Update the display
+                        this.keyboardStatusElement.innerHTML = status;
+                    }
+
+                    pressVirtualKey(keyName) {
+                        // Map virtual keyboard clicks to key events
+                        // Create a keyCode and code based on the keyName for our new keyboard handler
+                        const keyCode = this.getKeyCodeForVirtualKey(keyName);
+                        const code = this.getEventCodeForVirtualKey(keyName);
+                        const event = { 
+                            key: keyName.toLowerCase(), 
+                            code: code,
+                            keyCode: keyCode,
+                            preventDefault: () => {} 
+                        };
+                        console.log(`Virtual key pressed: ${keyName}, using code: ${code}`);
+                        this.handleKeyEvent(event, true);
+                    }
+
+                    releaseVirtualKey(keyName) {
+                        // Map virtual keyboard release to key events
+                        const keyCode = this.getKeyCodeForVirtualKey(keyName);
+                        const code = this.getEventCodeForVirtualKey(keyName);
+                        const event = { 
+                            key: keyName.toLowerCase(), 
+                            code: code,
+                            keyCode: keyCode, 
+                            preventDefault: () => {} 
+                        };
+                        console.log(`Virtual key released: ${keyName}, using code: ${code}`);
+                        this.handleKeyEvent(event, false);
+                    }
+                    
+                    // Helper method to generate event.code values for virtual keys
+                    getEventCodeForVirtualKey(keyName) {
+                        // Convert the keyName to the corresponding event.code value
+                        const key = keyName.toLowerCase();
+                        
+                        // Letters
+                        if (key.length === 1 && key >= 'a' && key <= 'z') {
+                            return `Key${key.toUpperCase()}`;
+                        }
+                        
+                        // Numbers
+                        if (key.length === 1 && key >= '0' && key <= '9') {
+                            return `Digit${key}`;
+                        }
+                        
+                        // Special keys
+                        const specialKeyMap = {
+                            'enter': 'Enter',
+                            'shift': 'ShiftLeft',
+                            'space': 'Space',
+                            'control': 'ControlLeft',
+                            'alt': 'AltLeft',
+                            'backspace': 'Backspace',
+                            'arrowleft': 'ArrowLeft',
+                            'arrowright': 'ArrowRight',
+                            'arrowup': 'ArrowUp',
+                            'arrowdown': 'ArrowDown'
+                        };
+                        
+                        return specialKeyMap[key] || 'Unknown';
+                    }
+                    
+                    // Helper method to generate keyCode values for virtual keys (for legacy support)
+                    getKeyCodeForVirtualKey(keyName) {
+                        const key = keyName.toLowerCase();
+                        
+                        // Letters (ASCII a-z: 97-122, A-Z: 65-90)
+                        if (key.length === 1 && key >= 'a' && key <= 'z') {
+                            return key.charCodeAt(0) - 32; // Convert to uppercase keyCode
+                        }
+                        
+                        // Numbers (ASCII 0-9: 48-57)
+                        if (key.length === 1 && key >= '0' && key <= '9') {
+                            return key.charCodeAt(0);
+                        }
+                        
+                        // Special keys
+                        const specialKeyCodeMap = {
+                            'enter': 13,
+                            'shift': 16,
+                            'control': 17,
+                            'alt': 18,
+                            'space': 32,
+                            'backspace': 8,
+                            'arrowleft': 37,
+                            'arrowup': 38,
+                            'arrowright': 39,
+                            'arrowdown': 40
+                        };
+                        
+                        return specialKeyCodeMap[key] || 0;
+                    }
+
+                    // BASIC program support has been removed
+                }
+
+                // BASIC interpreter has been removed
+
+                // Initialize the emulator when the page loads
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Get the canvas element
+                    const canvas = document.getElementById('spectrum-display');
+
+                    // Create the emulator instance
+                    const spectrum = new ZXSpectrum(canvas);
+
+                    // Set up keyboard status display element
+                    spectrum.keyboardStatusElement = document.getElementById('keyboard-status');
+                    
+                    // Set up event listeners for UI controls
+                    
+                    // Set up fast forward toggle
+                    document.getElementById('fast-forward').addEventListener('change', function() {
+                        if (this.checked) {
+                            console.log("Fast Forward mode enabled");
+                        } else {
+                            console.log("Fast Forward mode disabled");
+                        }
+                    });
+                    
+                    document.getElementById('start-button').addEventListener('click', () => {
+                        console.log('Start button clicked. Current state:', spectrum.running ? 'running' : 'stopped');
+
+                        if (spectrum.running) {
+                            // If already running, stop the emulation and reset to initial state
+                            spectrum.stopEmulation();
+                            spectrum.cpu.reset();
+                            spectrum.clearScreen();
+                            spectrum.borderColor = 1;
+                            document.getElementById('start-button').textContent = 'Start';
+                            document.getElementById('status-display').textContent = 'Emulator stopped';
+                            console.log('Emulator stopped');
+                        } else {
+                            // If not running, start the emulation
+                            spectrum.startEmulation();
+                            document.getElementById('start-button').textContent = 'Stop';
+                            document.getElementById('status-display').textContent = 'Emulator running';
+                            console.log('Emulator started');
+                            
+                            // Focus the emulator canvas to capture keyboard input
+                            spectrum.focusEmulator();
+                        }
+                    });
+
+                    document.getElementById('pause-button').addEventListener('click', () => {
+                        if (spectrum.running) {
+                            spectrum.stopEmulation();
+                            document.getElementById('pause-button').textContent = 'Resume';
+                        } else {
+                            spectrum.startEmulation();
+                            document.getElementById('pause-button').textContent = 'Pause';
+                            
+                            // Focus the emulator canvas when resuming
+                            spectrum.focusEmulator();
+                        }
+                    });
+
+                    // Add reset button listener
+                    document.getElementById('reset-button').addEventListener('click', () => {
+                        spectrum.resetEmulation();
+                        
+                        // Focus the emulator canvas after reset
+                        spectrum.focusEmulator();
+                    });
+
+                    // Set up FPS counter toggle
+                    document.getElementById('show-fps').addEventListener('change', (e) => {
+                        const fpsCounter = document.getElementById('fps-counter');
+                        fpsCounter.style.display = e.target.checked ? 'block' : 'none';
+                    });
+
+                    // Set up sound toggle
+                    document.getElementById('enable-sound').addEventListener('change', () => {
+                        // The sound will be controlled in the updateBeeper method
+                        // No need to do anything here as it checks the checkbox state in real-time
+                    });
+
+                    // Set up event listeners for ROM selection
+                    document.getElementById('rom-select').addEventListener('change', (e) => {
+                        const romType = e.target.value;
+                        
+                        // Load the selected ROM
+                        spectrum.loadROM(romType).then(() => {
+                            // Focus the emulator after ROM is loaded
+                            spectrum.focusEmulator();
+                            
+                            // If the emulator is already running, reset it to start with the new ROM
+                            if (spectrum.running) {
+                                spectrum.resetEmulation();
+                            }
+                        });
+                    });
+
+                    // Tabs have been removed
+                    console.log("UI simplified with tabs removed");
+
+                    // Set up keyboard handling
+                    spectrum.setupKeyboard();
+
+                    // Add runBasicProgram method to the ZXSpectrum class
+                    // BASIC program support has been removed
+
+                    // Load the ROM but don't start the emulator automatically
+                    spectrum.loadROM('48k').then(() => {
+                        // Don't auto-start - wait for user to click the Start button
+                        document.getElementById('start-button').textContent = 'Start';
+                        console.log('ROM loaded successfully. Ready to start emulation.');
+                        
+                        // Focus the emulator canvas after initial ROM load
+                        // This ensures keyboard input is captured as soon as the page loads
+                        spectrum.focusEmulator();
+                        
+                        // Also add a message to let the user know they can use keyboard
+                        document.getElementById('status-display').textContent = 'Ready - Click Start to begin, keyboard input active';
+                    }).catch(error => {
+                        console.error('Failed to load ROM:', error);
+                        document.getElementById('status-display').textContent = 'Error loading ROM. Please check console.';
+                    });
+                });
+            </script>
+        </body>
+        </html>
