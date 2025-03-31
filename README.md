@@ -36,3 +36,15 @@ TODO:
 - Make the video-score sync work.
 
 ![one file blocks](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-guitar-tab-youtube.jpeg)
+
+onefile-zx-spectrum-v2
+======================
+A simple ZX Spectrum emulator, features model selection between 48K, 128K, +2 and +3, sound (beeper) and video emulation with FPS counter and "fast forward" mode, keyboard mapping, memory banks swap methods for models 128K and later. It uses the Z80 JavaScript implementation of [DrGoldfire](https://github.com/DrGoldfire/Z80.js/tree/master) and the ZX Spectrum roms from [spectrumforeveryone](https://github.com/spectrumforeveryone/zx-roms) loaded online just not to depend of local files.
+
+TODO:
+- Make the input *finally* work.
+- Make the 128K, +2 and +3 work.
+- Add the ability to load .z80, .sna, .tap and .tzx files.
+- AY sound support.
+
+![one file blocks](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-zx-spectrum-v2.png)
