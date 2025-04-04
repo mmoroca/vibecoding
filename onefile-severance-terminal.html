@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Severance - MDR Terminal</title>
+  
+  <!-- Audio elements for sound effects -->
+  <audio id="startup-sound" preload="auto">
+    <source src="data:audio/mp3;base64,SUQzAwAAAAAAIlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uSwAAAAAABLBQAAAL6QWYnYAAAEgAAAAIAAABTb3VuZEph//uSwP///8KGT2QEAAi0AuY3gCAElpY20AAAAFNvdW5kSmF5LmNvbSBTb3VuZCBFZmZlY3RzAAA=" type="audio/mp3">
+  </audio>
+  <audio id="sequence-sound" preload="auto">
+    <source src="data:audio/mp3;base64,SUQzAwAAAAAAIlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uSwAAAAAABLBQAAAL6QWYnYAAAEgAAAAIAAABTb3VuZEph//uSwP///8KGT2QEAAi0AuY3gCAElpY20AAAAFNvdW5kSmF5LmNvbSBTb3VuZCBFZmZlY3RzAAA=" type="audio/mp3">
+  </audio>
+  <audio id="click-sound" preload="auto">
+    <source src="data:audio/mp3;base64,SUQzAwAAAAAAIlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uSwAAAAAABLBQAAAL6QWYnYAAAEgAAAAIAAABTb3VuZEph//uSwP///8KGT2QEAAi0AuY3gCAElpY20AAAAFNvdW5kSmF5LmNvbSBTb3VuZCBFZmZlY3RzAAA=" type="audio/mp3">
+  </audio>
+  <audio id="bin-sound" preload="auto">
+    <source src="data:audio/mp3;base64,SUQzAwAAAAAAIlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uSwAAAAAABLBQAAAL6QWYnYAAAEgAAAAIAAABTb3VuZEph//uSwP///8KGT2QEAAi0AuY3gCAElpY20AAAAFNvdW5kSmF5LmNvbSBTb3VuZCBFZmZlY3RzAAA=" type="audio/mp3">
+  </audio>
+  <audio id="reset-sound" preload="auto">
+    <source src="data:audio/mp3;base64,SUQzAwAAAAAAIlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uSwAAAAAABLBQAAAL6QWYnYAAAEgAAAAIAAABTb3VuZEph//uSwP///8KGT2QEAAi0AuY3gCAElpY20AAAAFNvdW5kSmF5LmNvbSBTb3VuZCBFZmZlY3RzAAA=" type="audio/mp3">
+  </audio>
+  <audio id="glitch-sound" preload="auto">
+    <source src="data:audio/mp3;base64,SUQzAwAAAAAAIlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uSwAAAAAABLBQAAAL6QWYnYAAAEgAAAAIAAABTb3VuZEph//uSwP///8KGT2QEAAi0AuY3gCAElpY20AAAAFNvdW5kSmF5LmNvbSBTb3VuZCBFZmZlY3RzAAA=" type="audio/mp3">
+  </audio>
+  <audio id="transition-sound" preload="auto">
+    <source src="data:audio/mp3;base64,SUQzAwAAAAAAIlRQRTEAAAAcAAAAU291bmRKYXkuY29tIFNvdW5kIEVmZmVjdHMA//uSwAAAAAABLBQAAAL6QWYnYAAAEgAAAAIAAABTb3VuZEph//uSwP///8KGT2QEAAi0AuY3gCAElpY20AAAAFNvdW5kSmF5LmNvbSBTb3VuZCBFZmZlY3RzAAA=" type="audio/mp3">
+  </audio>
+  <style>
+    /* Global styles */
+    body, html {
+      margin: 0;
+      padding: 0;
+      cursor: default;
+      font-family: monospace;
+      background-color: #000;
+      height: 100%;
+      color: #d6e6ff;
+      overflow: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    .terminal {
+      border: 4px solid #2a3a59;
+      border-radius: 6px;
+      background-color: #000613;
+      position: relative;
+      box-shadow: 0 0 20px rgba(120, 180, 255, 0.15);
+      height: 90vh;
+      max-height: 700px; /* Set a max height to ensure everything fits */
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* CRT effects */
+    .terminal::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%),
+        linear-gradient(90deg, rgba(180, 210, 255, 0.03), rgba(180, 210, 255, 0.02), rgba(180, 210, 255, 0.03));
+      background-size: 100% 2px, 3px 100%;
+    }
+
+    .scanline {
+      position: absolute;
+      top: 0;
+      width: 100%;
+      height: 4px;
+      background: rgba(180, 210, 255, 0.07);
+      z-index: 3;
+      animation: scanline 10s linear infinite;
+      opacity: 0.5;
+    }
+
+    @keyframes scanline {
+      0% { top: 0%; }
+      100% { top: 100%; }
+    }
+
+    /* Terminal header */
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 20px;
+      border-bottom: 1px solid rgba(120, 160, 255, 0.25);
+    }
+
+    .terminal-title, .terminal-user {
+      animation: textglow 1.5s ease-in-out infinite alternate;
+      text-shadow: 0 0 5px rgba(180, 210, 255, 0.5);
+    }
+
+    @keyframes textglow {
+      from { text-shadow: 0 0 2px rgba(180, 210, 255, 0.3); }
+      to { text-shadow: 0 0 8px rgba(180, 210, 255, 0.5); }
+    }
+
+    /* Main content */
+    .terminal-content {
+      padding: 20px;
+      flex-grow: 1;
+      animation: flicker 8s linear infinite;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.1s ease-out;
+      will-change: transform;
+    }
+
+    @keyframes flicker {
+      0% { opacity: 0.98; }
+      5% { opacity: 1; }
+      10% { opacity: 0.99; }
+      15% { opacity: 1; }
+      20% { opacity: 0.98; }
+      50% { opacity: 1; }
+      80% { opacity: 0.98; }
+      85% { opacity: 1; }
+      95% { opacity: 0.99; }
+      100% { opacity: 1; }
+    }
+
+    .terminal-prompt {
+      margin-bottom: 20px;
+      max-height: 150px;
+      overflow: hidden;
+    }
+
+    .prompt-text {
+      color: #a9c4ee;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 15px;
+      background-color: #a9c4ee;
+      margin-left: 5px;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    /* Numbers grid */
+    .numbers-container {
+      margin-bottom: 10px;
+      overflow: hidden;
+      flex-grow: 1;
+      position: relative;
+      max-height: 510px; /* Limit the height to ensure bins are visible */
+    }
+
+    .numbers-viewport {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      padding: 10px;
+      box-sizing: border-box;
+      position: relative;
+    }
+
+    .numbers-grid {
+      display: grid;
+      grid-template-columns: repeat(30, 24px);
+      gap: 15px 15px; /* Smaller 15px spacing */
+      width: fit-content; /* Adjusted width */
+      height: fit-content; /* Adjusted height */
+      margin-top: 5px;
+      padding: 2px;
+      box-sizing: border-box;
+    }
+
+    @media (max-width: 768px) {
+      .numbers-grid {
+        grid-template-columns: repeat(10, 1fr);
+      }
+    }
+
+    .number-cell {
+      height: 24px;
+      width: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      transition: all 0.3s;
+      opacity: 0;
+      transform: scale(0.5);
+      cursor: default;
+      position: relative;
+      color: #a5ddff; /* Lighter shade of blue */
+      text-shadow: 0 0 4px rgba(180, 210, 255, 0.5);
+    }
+
+    .number-visible {
+      opacity: 1;
+      transform: scale(1);
+      animation: jiggle 0.8s infinite alternate ease-in-out;
+    }
+
+    @keyframes jiggle {
+      0% { transform: translate(0, 0) rotate(-1deg); }
+      25% { transform: translate(-1px, 1px) rotate(0deg); }
+      50% { transform: translate(1px, -1px) rotate(1deg); }
+      75% { transform: translate(1px, 1px) rotate(0deg); }
+      100% { transform: translate(-1px, -1px) rotate(-1deg); }
+    }
+
+    .number-selected {
+      animation: jiggle 0.8s infinite alternate ease-in-out; /* Continue jiggling when selected */
+      color: #ffffff;
+      transform: scale(1.5);
+      z-index: 1;
+      opacity: 1; /* Ensure selected numbers stay visible */
+      text-shadow: 0 0 10px rgba(180, 210, 255, 0.8);
+    }
+
+    .number-growing {
+      animation: grow 0.3s forwards, jiggle 0.8s infinite alternate ease-in-out; /* Add jiggle animation alongside grow */
+    }
+
+    @keyframes grow {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 1; }
+    }
+
+    .number-highlighted {
+      animation: highlight 0.5s;
+    }
+
+    @keyframes highlight {
+      0% { background-color: rgba(120, 160, 255, 0); }
+      50% { background-color: rgba(120, 160, 255, 0.5); }
+      100% { background-color: rgba(120, 160, 255, 0); }
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1.8); }
+      100% { transform: scale(2.2); }
+    }
+
+    .number-cell:hover {
+      color: #ffffff;
+      text-shadow: 0 0 8px rgba(180, 210, 255, 0.6);
+    }
+
+    /* Bins panel inside terminal */
+    .bin-info-panel {
+      margin-top: auto;
+      border-top: 1px solid rgba(120, 160, 255, 0.25);
+      background-color: rgba(0, 6, 19, 0.9);
+      height: 30px; /* Slightly taller to ensure visibility */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: height 0.3s ease-in-out;
+      position: relative;
+      z-index: 50; /* Ensure it's above other elements */
+    }
+    
+    .bin-info-panel.expanded {
+      height: 70px; /* Taller expanded state to accommodate the taller bins */
+    }
+    
+    .bin-toggle {
+      position: absolute;
+      top: -12px;
+      right: 20px;
+      width: 40px;
+      height: 12px;
+      background-color: #081225;
+      border: 1px solid rgba(120, 160, 255, 0.25);
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      cursor: default;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: rgba(169, 196, 238, 0.8);
+      font-size: 8px;
+      z-index: 101;
+    }
+    
+    .bin-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px; /* More space between thinner bins */
+      width: 100%;
+      max-width: 700px;
+      padding: 0 20px;
+    }
+
+    .bin {
+      flex: 1;
+      max-width: 100px; /* Limit bin width */
+      height: 45px; /* Taller bins for better visibility */
+      border: 1px solid rgba(120, 160, 255, 0.25);
+      background-color: rgba(120, 160, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bin-lid {
+      height: 8px;
+      background-color: rgba(120, 160, 255, 0.15);
+      width: 100%;
+      transform-origin: top;
+      transform: rotateX(0deg);
+      transition: transform 0.5s;
+    }
+
+    .bin-lid.open {
+      transform: rotateX(70deg);
+    }
+
+    .bin-progress {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 3px;
+      height: 100%;
+    }
+
+    .progress-bar {
+      width: 4px;
+      height: 0%;
+      transition: height 0.5s ease-out;
+      margin: 0 1px;
+    }
+
+    .progress-bar-orange {
+      background-color: #ff8b3d;
+    }
+
+    .progress-bar-green {
+      background-color: #3dff8b;
+    }
+
+    .progress-bar-blue {
+      background-color: #3d8bff;
+    }
+
+    .bin-label {
+      text-align: center;
+      font-size: 10px;
+      margin-top: 2px;
+      color: #a9c4ee;
+    }
+
+    /* Controls */
+    .control-panel {
+      margin-top: 30px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(120, 160, 255, 0.25);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .button {
+      background-color: #000613;
+      border: 1px solid #a9c4ee;
+      color: #a9c4ee;
+      padding: 6px 15px;
+      cursor: default;
+      transition: all 0.2s;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+
+    .button:hover {
+      background-color: rgba(120, 160, 255, 0.15);
+    }
+
+    .button-active {
+      background-color: rgba(120, 160, 255, 0.15);
+    }
+
+    /* Terminal output */
+    .terminal-output {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(120, 160, 255, 0.25);
+      height: 100px;
+      overflow-y: auto;
+      font-size: 14px;
+      color: rgba(169, 196, 238, 0.8);
+    }
+
+    /* Terminal footer */
+    .terminal-footer {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 20px;
+      border-top: 1px solid rgba(120, 160, 255, 0.25);
+      font-size: 14px;
+      color: rgba(169, 196, 238, 0.7);
+    }
+
+    /* Throwing animation */
+    .number-throwing {
+      position: fixed;
+      font-size: 12px;
+      color: #a5ddff; /* Lighter blue to match the normal numbers */
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: jiggle 0.8s infinite alternate ease-in-out; /* Added constant jiggle animation */
+      z-index: 1000;
+      text-shadow: 0 0 6px rgba(180, 210, 255, 0.7);
+    }
+
+    /* Severance Glitch effects */
+    .glitch-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 10000;
+      opacity: 0;
+      background: rgba(0, 0, 0, 0);
+      transition: opacity 0.1s;
+    }
+
+    .glitch-overlay.active {
+      opacity: 1;
+      animation: glitch-flash 0.5s forwards;
+    }
+
+    .glitch-text {
+      position: fixed;
+      color: white;
+      font-family: monospace;
+      font-size: 28px;
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+      z-index: 10001;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .glitch-text.active {
+      animation: glitch-text 2s forwards;
+    }
+
+    .glitch-line {
+      position: fixed;
+      background: rgba(255, 255, 255, 0.8);
+      height: 2px;
+      width: 100%;
+      top: 50%;
+      z-index: 10002;
+      opacity: 0;
+    }
+
+    .glitch-line.active {
+      animation: glitch-line 0.4s forwards;
+    }
+    
+    /* Glitch animation keyframes */
+    @keyframes glitch-flash {
+      0% { background: rgba(0, 0, 0, 0); }
+      10% { background: rgba(255, 255, 255, 0.9); }
+      12% { background: rgba(0, 0, 0, 0.9); }
+      14% { background: rgba(255, 255, 255, 0.8); }
+      15% { background: rgba(0, 0, 0, 0.2); }
+      20% { background: rgba(0, 6, 19, 0.4); }
+      25% { background: rgba(180, 210, 255, 0.3); }
+      30% { background: rgba(0, 6, 19, 0.5); }
+      40% { background: rgba(0, 0, 0, 0.2); }
+      45% { background: rgba(255, 255, 255, 0.2); }
+      50% { background: rgba(0, 0, 0, 0.1); }
+      55% { background: rgba(0, 6, 19, 0.4); }
+      100% { background: rgba(0, 0, 0, 0); }
+    }
+    
+    @keyframes glitch-text {
+      0% { opacity: 0; filter: blur(10px); }
+      15% { opacity: 0.9; filter: blur(0px); }
+      18% { opacity: 0.2; filter: blur(5px); }
+      20% { opacity: 0.9; filter: blur(0px); transform: translate(-50%, -50%) scale(1.0); }
+      25% { transform: translate(-50%, -50%) scale(1.0); opacity: 0.8; }
+      40% { transform: translate(-50%, -50%) scale(1.02); opacity: 0.9; }
+      45% { opacity: 0.2; }
+      50% { opacity: 0.8; }
+      70% { opacity: 0.7; }
+      80% { opacity: 0.6; }
+      90% { opacity: 0.4; }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+    }
+    
+    @keyframes glitch-line {
+      0% { opacity: 0; transform: scaleX(0); }
+      10% { opacity: 1; transform: scaleX(1); }
+      15% { opacity: 0.8; transform: translateY(-100px) scaleX(0.8); }
+      20% { opacity: 1; transform: translateY(100px) scaleX(1.2); }
+      25% { opacity: 0.4; transform: translateY(-80px) scaleX(0.6); }
+      30% { opacity: 0.8; transform: translateY(0) scaleX(1); }
+      40% { opacity: 0.5; }
+      60% { opacity: 0.2; }
+      100% { opacity: 0; }
+    }
+
+    /* Text distortion effect */
+    .glitch-text-effect {
+      animation-duration: 0.01s;
+      animation-name: textglitch;
+      animation-iteration-count: infinite;
+      animation-timing-function: linear;
+    }
+
+    @keyframes textglitch {
+      0% {
+        transform: translate(0);
+        opacity: 1;
+      }
+      2% {
+        transform: translate(-3px, 2px);
+        opacity: 0.8;
+      }
+      4% {
+        transform: translate(5px, -2px);
+        opacity: 0.9;
+      }
+      6% {
+        transform: translate(-5px, 2px);
+        opacity: 0.8;
+      }
+      8% {
+        transform: translate(0);
+        opacity: 1;
+      }
+      10% {
+        transform: translate(0);
+        opacity: 1;
+      }
+      100% {
+        transform: translate(0);
+        opacity: 1;
+      }
+    }
+
+    /* Flickering screen effect */
+    .screen-flicker {
+      animation: screenflicker 0.15s infinite;
+    }
+
+    @keyframes screenflicker {
+      0% { opacity: 1; }
+      49% { opacity: 1; }
+      50% { opacity: 0.7; }
+      51% { opacity: 1; }
+      59% { opacity: 1; }
+      60% { opacity: 0.8; }
+      61% { opacity: 1; }
+      100% { opacity: 1; }
+    }
+    
+    /* Loading screen with authentic Lumon animations */
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000613;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 12000;
+      flex-direction: column;
+    }
+    
+    .loading-screen.hidden {
+      display: none;
+    }
+    
+    .lumon-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    
+    .loading-animation {
+      margin-bottom: 30px;
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .loading-gif {
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+    }
+    
+    .loading-text {
+      color: #a5ddff;
+      font-size: 18px;
+      margin-bottom: 20px;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- Glitch overlay elements -->
+  <div class="glitch-overlay" id="glitch-overlay"></div>
+  <div class="glitch-text" id="glitch-text"></div>
+  <div class="glitch-line" id="glitch-line"></div>
+  
+  <!-- Lumon loading screen with authentic animation sequence -->
+  <div class="loading-screen" id="loading-screen">
+    <div class="lumon-logo">
+      <!-- First loading animation - Lumon Logo Screen -->
+      <div class="loading-animation" id="logo-animation">
+        <img src="https://freight.cargo.site/w/800/q/94/i/4a1ebd7f92dd623827597d9165eb9fd9f7b94f08b0d13fc87a86917984a279e4/Logo_Load_Up_Screen_2.gif" alt="Lumon Logo Loading" class="loading-gif">
+      </div>
+      
+      <!-- Second loading animation - File Selector Screen -->
+      <div class="loading-animation" id="file-selector-animation" style="display: none;">
+        <img src="https://freight.cargo.site/w/800/q/94/i/504afefbd468eec99223c3bca1190f9105fc18cdd458a2d341b7b5e07092c946/File_Selector_Screen_duo.gif" alt="File Selector" class="loading-gif">
+      </div>
+      
+      <div class="loading-text">INITIALIZING MACRODATA REFINEMENT</div>
+    </div>
+  </div>
+  
+  <div class="container">
+    <div class="terminal">
+      <!-- CRT scanline effect -->
+      <div class="scanline"></div>
+      
+      <!-- Terminal header -->
+      <div class="terminal-header">
+        <div class="terminal-title">LUMON INDUSTRIES [MDR DIVISION]</div>
+        <div class="terminal-user">TERMINAL ACCESS: MARK S.</div>
+      </div>
+      
+      <!-- Main terminal content -->
+      <div class="terminal-content">
+        <!-- Terminal prompt -->
+        <div class="terminal-prompt" style="white-space: nowrap; overflow: hidden; max-height: 120px;">
+          <p class="prompt-text">WELCOME TO MACRODATA REFINEMENT</p>
+          <p class="prompt-text">PLEASE SORT THE FOLLOWING NUMBERS BY INTUITION:</p>
+          <div>
+            <span>MDR$</span>
+            <span style="margin-left: 8px;">INITIATE SEQUENCE</span>
+            <span class="cursor"></span>
+          </div>
+        </div>
+        
+        <!-- Number grid -->
+        <div class="numbers-container">
+          <p class="prompt-text">IDENTIFYING NUMBERS THAT FEEL "SCARY"</p>
+          <div class="numbers-viewport" id="numbers-viewport">
+            <div class="numbers-grid" id="numbers-grid">
+              <!-- Numbers will be generated here via JavaScript -->
+            </div>
+          </div>
+        </div>
+        
+        <!-- Bins removed from here, moved to fixed panel at bottom -->
+        
+        <!-- Hidden control elements - still needed for functionality but not visible -->
+        <div style="display: none;">
+          <button id="start-btn" class="button">START SEQUENCE</button>
+          <button id="reset-btn" class="button">RESET</button>
+          <span id="quota-display">0</span>
+        </div>
+        
+        <!-- Terminal output - hidden but kept for logging -->
+        <div class="terminal-output" id="terminal-output" style="display: none;">
+          <div>System initialized. Awaiting user input...</div>
+          <div>Ready to begin. Please select START to commence number sorting.</div>
+        </div>
+      </div>
+      
+      <!-- Bin info panel inside terminal -->
+      <div class="bin-info-panel" id="bin-info-panel">
+        <div class="bin-toggle" id="bin-toggle">▲</div>
+        <div class="bin-container" id="bin-container">
+          <div class="bin">
+            <div class="bin-lid" id="bin-lid-1"></div>
+            <div class="bin-progress">
+              <div class="progress-bar progress-bar-orange" id="progress-orange-1"></div>
+            </div>
+            <div class="bin-label">BIN 1</div>
+          </div>
+          <div class="bin">
+            <div class="bin-lid" id="bin-lid-2"></div>
+            <div class="bin-progress">
+              <div class="progress-bar progress-bar-green" id="progress-green-2"></div>
+            </div>
+            <div class="bin-label">BIN 2</div>
+          </div>
+          <div class="bin">
+            <div class="bin-lid" id="bin-lid-3"></div>
+            <div class="bin-progress">
+              <div class="progress-bar progress-bar-blue" id="progress-blue-3"></div>
+            </div>
+            <div class="bin-label">BIN 3</div>
+          </div>
+          <div class="bin">
+            <div class="bin-lid" id="bin-lid-4"></div>
+            <div class="bin-progress">
+              <div class="progress-bar progress-bar-orange" id="progress-orange-4" style="height: 0%"></div>
+              <div class="progress-bar progress-bar-green" id="progress-green-4" style="height: 0%"></div>
+              <div class="progress-bar progress-bar-blue" id="progress-blue-4" style="height: 0%"></div>
+            </div>
+            <div class="bin-label">BIN 4</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal footer -->
+      <div class="terminal-footer">
+        <div>LUMON OS v3.7.42</div>
+        <div>QUOTA: <span id="footer-quota-display">0</span>%</div>
+        <div>REMEMBER: WORK IS MYSTERIOUS AND IMPORTANT</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio elements -->
+  <audio id="startup-sound" src="https://assets.codepen.io/7297356/startup.mp3"></audio>
+  <audio id="sequence-sound" src="https://assets.codepen.io/7297356/sequence.mp3"></audio>
+  <audio id="click-sound" src="https://assets.codepen.io/7297356/click.mp3"></audio>
+  <audio id="bin-sound" src="https://assets.codepen.io/7297356/bin.mp3"></audio>
+  <audio id="reset-sound" src="https://assets.codepen.io/7297356/reset.mp3"></audio>
+  <audio id="glitch-sound" src="https://assets.codepen.io/7297356/glitch.mp3"></audio>
+  <audio id="transition-sound" src="https://assets.codepen.io/7297356/transition.mp3"></audio>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Sound elements
+      const startupSound = document.getElementById('startup-sound');
+      const sequenceSound = document.getElementById('sequence-sound');
+      const clickSound = document.getElementById('click-sound');
+      const binSound = document.getElementById('bin-sound');
+      const resetSound = document.getElementById('reset-sound');
+      const glitchSound = document.getElementById('glitch-sound');
+      const transitionSound = document.getElementById('transition-sound');
+      
+      // Glitch effect elements
+      const glitchOverlay = document.getElementById('glitch-overlay');
+      const glitchText = document.getElementById('glitch-text');
+      const glitchLine = document.getElementById('glitch-line');
+      
+      // Loading screen elements
+      const loadingScreen = document.getElementById('loading-screen');
+      const logoAnimation = document.getElementById('logo-animation');
+      const fileSelectorAnimation = document.getElementById('file-selector-animation');
+      
+      // Show loading screen with authentic Severance animation sequence
+      function showLoadingScreen() {
+        loadingScreen.classList.remove('hidden');
+        
+        // First show the Lumon logo animation
+        logoAnimation.style.display = 'flex';
+        fileSelectorAnimation.style.display = 'none';
+        
+        // Play startup sound
+        playSound(startupSound, 0.4);
+        
+        // After logo animation plays for a while, transition to file selector
+        setTimeout(() => {
+          // Hide logo animation and show file selector
+          logoAnimation.style.display = 'none';
+          fileSelectorAnimation.style.display = 'flex';
+          
+          // Play transition sound for switching animations
+          playSound(transitionSound, 0.4);
+          
+          // After file selector animation plays for a bit, transition to the terminal
+          setTimeout(() => {
+            // Play transition sound when loading completes
+            playSound(glitchSound, 0.5);
+            
+            // Add a glitch effect when transitioning from loading to main screen
+            triggerGlitchEffect("MACRODATA REFINEMENT INITIALIZED", 1500);
+            
+            // Hide the loading screen after a short delay
+            setTimeout(() => {
+              loadingScreen.classList.add('hidden');
+            }, 1500);
+          }, 5000); // Show file selector for 5 seconds
+        }, 4000); // Show logo for 4 seconds
+      }
+      
+      // Show the loading screen on initial page load
+      showLoadingScreen();
+      
+      // Trigger glitch effect with optional text
+      function triggerGlitchEffect(text = "", duration = 500) {
+        // Play glitch sound
+        playSound(glitchSound, 0.5);
+        
+        // Activate visual effects
+        glitchOverlay.classList.add('active');
+        glitchLine.classList.add('active');
+        
+        // Set text if provided
+        if (text) {
+          glitchText.textContent = text;
+          glitchText.classList.add('active');
+        }
+        
+        // Remove effects after duration
+        setTimeout(() => {
+          glitchOverlay.classList.remove('active');
+          glitchLine.classList.remove('active');
+          glitchText.classList.remove('active');
+        }, duration);
+      }
+      
+      // Sound utility function with error handling
+      function playSound(sound, volume = 0.6) {
+        try {
+          if (sound) {
+            sound.volume = volume;
+            sound.currentTime = 0;
+            
+            // Many browsers block autoplay, so we catch the promise rejection
+            let playPromise = sound.play();
+            
+            if (playPromise !== undefined) {
+              playPromise.catch(error => {
+                // Auto-play was prevented - this is expected in some browsers
+                console.log("Audio playback prevented:", error.message);
+                // We won't show an error to the user as sound is not critical
+              });
+            }
+          }
+        } catch (e) {
+          console.log("Audio system error:", e);
+          // Continue without sound if an error occurs
+        }
+      }
+      
+      // Elements
+      const numbersGrid = document.getElementById('numbers-grid');
+      const startButton = document.getElementById('start-btn');
+      const resetButton = document.getElementById('reset-btn');
+      const quotaDisplay = document.getElementById('quota-display');
+      const terminalOutput = document.getElementById('terminal-output');
+      const binContainer = document.getElementById('bin-container');
+      
+      // Add Enter key listener to start sequence automatically
+      document.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && !activeSequence) {
+          startSequence();
+        }
+      });
+
+      // Bin elements
+      const binLids = [
+        document.getElementById('bin-lid-1'),
+        document.getElementById('bin-lid-2'),
+        document.getElementById('bin-lid-3'),
+        document.getElementById('bin-lid-4')
+      ];
+
+      // Progress bars
+      const progressBars = {
+        orange: [
+          document.getElementById('progress-orange-1'),
+          null,
+          null,
+          document.getElementById('progress-orange-4')
+        ],
+        green: [
+          null,
+          document.getElementById('progress-green-2'),
+          null,
+          document.getElementById('progress-green-4')
+        ],
+        blue: [
+          null,
+          null,
+          document.getElementById('progress-blue-3'),
+          document.getElementById('progress-blue-4')
+        ]
+      };
+
+      // State variables
+      const totalNumbers = 500; // Significantly increased number of numbers to fill the grid
+      let numbers = [];
+      let selectedNumbers = [];
+      let activeSequence = false;
+      let currentQuota = 0;
+      let binValues = [0, 0, 0, 0];
+      let maxBinValue = 100;
+      
+      // Initialize grid
+      function initializeGrid() {
+        numbersGrid.innerHTML = '';
+        numbers = [];
+        
+        for (let i = 0; i < totalNumbers; i++) {
+          const cell = document.createElement('div');
+          cell.classList.add('number-cell');
+          cell.dataset.index = i;
+          
+          // Store number data
+          numbers.push({
+            index: i,
+            value: null,
+            isVisible: false,
+            isSelected: false
+          });
+          
+          // Add click handler
+          cell.addEventListener('click', function() {
+            if (activeSequence && numbers[i].isVisible && !numbers[i].isSelected) {
+              handleNumberClick(i);
+            }
+          });
+          
+          numbersGrid.appendChild(cell);
+        }
+        
+        selectedNumbers = [];
+        resetBins();
+        updateQuota();
+      }
+
+      // Reset bin values
+      function resetBins() {
+        binValues = [0, 0, 0, 0];
+        
+        // Reset progress bars
+        for (let i = 0; i < 4; i++) {
+          if (progressBars.orange[i]) progressBars.orange[i].style.height = '0%';
+          if (progressBars.green[i]) progressBars.green[i].style.height = '0%';
+          if (progressBars.blue[i]) progressBars.blue[i].style.height = '0%';
+        }
+      }
+
+      // Generate random numbers
+      function generateNumbers() {
+        // Create a compact grid with consistent spacing by carefully generating the number set
+        return Array.from({ length: totalNumbers }, () => {
+          // Generate numbers between 0-99 to keep them visually consistent
+          return Math.floor(Math.random() * 100);
+        });
+      }
+
+      // Display numbers sequentially with animation
+      function displayNumbersSequentially(generatedNumbers) {
+        if (!activeSequence) return;
+        
+        addTerminalLog('Initializing number sequence...');
+        
+        let displayedCount = 0;
+        const availableIndices = [...Array(totalNumbers).keys()];
+        
+        const displayInterval = setInterval(() => {
+          if (displayedCount >= generatedNumbers.length || !activeSequence) {
+            clearInterval(displayInterval);
+            if (activeSequence) {
+              addTerminalLog('Sequence complete. Please identify and select "scary" numbers.');
+            }
+            return;
+          }
+          
+          // Display multiple numbers at once to speed up the process
+          const numbersToShowPerInterval = 5;
+          for (let i = 0; i < numbersToShowPerInterval; i++) {
+            if (displayedCount >= generatedNumbers.length || availableIndices.length === 0) break;
+            
+            // Get a random index that hasn't been filled yet
+            const randomArrayIndex = Math.floor(Math.random() * availableIndices.length);
+            const randomNumberIndex = availableIndices[randomArrayIndex];
+            
+            // Remove this index from available indices
+            availableIndices.splice(randomArrayIndex, 1);
+            
+            // Update number in our data
+            numbers[randomNumberIndex].value = generatedNumbers[displayedCount];
+            numbers[randomNumberIndex].isVisible = true;
+            
+            // Update DOM
+            const cell = numbersGrid.children[randomNumberIndex];
+            cell.textContent = generatedNumbers[displayedCount];
+            cell.classList.add('number-visible');
+            
+            displayedCount++;
+          }
+        }, 20);
+      }
+
+      // Handle number click
+      function handleNumberClick(index) {
+        if (!activeSequence) return;
+        
+        // Play click sound
+        playSound(clickSound, 0.5);
+        
+        // Select the number
+        numbers[index].isSelected = true;
+        
+        // Update DOM
+        const cell = numbersGrid.children[index];
+        // Keep the number visible but stop the jiggle animation
+        cell.classList.remove('number-visible');
+        cell.classList.add('number-growing');
+        
+        setTimeout(() => {
+          cell.classList.add('number-selected');
+          cell.style.opacity = '1'; // Ensure it stays fully visible
+          selectedNumbers.push(index);
+          addTerminalLog(`Number ${numbers[index].value} selected as "scary".`);
+          
+          // If we have 3 selected numbers, process them
+          if (selectedNumbers.length === 3) {
+            processSelectedNumbers();
+          }
+        }, 300);
+      }
+
+      // Process 3 selected numbers
+      function processSelectedNumbers() {
+        addTerminalLog(`Processing group of 3 numbers...`);
+        
+        // Choose a random bin (0-3)
+        const binIndex = Math.floor(Math.random() * 4);
+        
+        // Play bin sound
+        playSound(binSound, 0.6);
+        
+        // Get the center coordinates of the terminal-content element
+        const terminalContent = document.querySelector('.terminal-content');
+        const terminalRect = terminalContent.getBoundingClientRect();
+        const centerX = terminalRect.width / 2;
+        const centerY = terminalRect.height / 2;
+        
+        // Store both floating numbers and their original indices
+        const floatingNums = [];
+        
+        // Step 1: Create floating numbers at original positions
+        selectedNumbers.forEach((numIndex, i) => {
+          const cell = numbersGrid.children[numIndex];
+          const numValue = numbers[numIndex].value;
+          
+          // Create a floating number element to animate
+          const floatingNum = document.createElement('div');
+          floatingNum.textContent = numValue;
+          floatingNum.classList.add('number-throwing');
+          
+          // Position it at the same spot as the cell
+          const cellRect = cell.getBoundingClientRect();
+          const containerRect = terminalContent.getBoundingClientRect();
+          
+          // Position relative to the terminal
+          floatingNum.style.top = `${cellRect.top - containerRect.top + window.scrollY}px`;
+          floatingNum.style.left = `${cellRect.left - containerRect.left + window.scrollX}px`;
+          floatingNum.style.transform = 'scale(1.5)'; // Make it larger like selected numbers
+          
+          // Append to the container
+          terminalContent.appendChild(floatingNum);
+          
+          // Store both the element and its original index
+          floatingNums.push({
+            element: floatingNum,
+            originalIndex: numIndex
+          });
+          
+          // Remove the original number from the grid
+          cell.textContent = '';
+          cell.classList.remove('number-selected', 'number-visible', 'number-growing');
+          
+          // Mark this number as no longer visible or selected
+          numbers[numIndex].isVisible = false;
+          numbers[numIndex].isSelected = false;
+        });
+        
+        // Step 2: Animate moving to center with slight delay
+        floatingNums.forEach((item, i) => {
+          const floatingNum = item.element;
+          
+          // Calculate the center coordinates (with slight offsets for each number)
+          const centerOffsetX = centerX + (i - 1) * 15; // Offset them slightly so they don't overlay
+          const centerOffsetY = centerY;
+          
+          // Add a slight delay for each number to create staggered animation
+          setTimeout(() => {
+            floatingNum.style.transition = 'top 0.4s ease-out, left 0.4s ease-out';
+            floatingNum.style.top = `${centerOffsetY}px`;
+            floatingNum.style.left = `${centerOffsetX}px`;
+          }, i * 100); // Staggered timing
+        });
+        
+        // Step 3: After numbers have moved to center, open bin and throw them
+        setTimeout(() => {
+          // Open the bin lid
+          binLids[binIndex].classList.add('open');
+          
+          // Now throw each number to the bin with staggered timing
+          floatingNums.forEach((item, i) => {
+            const floatingNum = item.element;
+            const originalIndex = item.originalIndex;
+            
+            // Delayed throw based on index
+            setTimeout(() => {
+              const binRect = binLids[binIndex].getBoundingClientRect();
+              const containerRect = terminalContent.getBoundingClientRect();
+              
+              // Calculate the destination coordinates for the bin
+              const destX = binRect.left - containerRect.left + binRect.width/2 - 14 + window.scrollX;
+              const destY = binRect.top - containerRect.top - 5 + window.scrollY;
+              
+              // Define the animation for throwing
+              floatingNum.style.transition = 'top 0.6s ease-in, left 0.6s ease-in';
+              floatingNum.style.top = `${destY}px`;
+              floatingNum.style.left = `${destX}px`;
+              
+              // Create a new number in its place after a delay
+              setTimeout(() => {
+                if (activeSequence) {
+                  // Generate a new random number
+                  const newNumber = Math.floor(Math.random() * 100);
+                  
+                  // Update our data structure
+                  numbers[originalIndex].value = newNumber;
+                  numbers[originalIndex].isVisible = true;
+                  
+                  // Update the cell
+                  const cell = numbersGrid.children[originalIndex];
+                  cell.textContent = newNumber;
+                  cell.classList.add('number-visible');
+                }
+              }, 800 + Math.random() * 600); // Random delay for replacement
+              
+              // Remove the floating number after it reaches the bin
+              setTimeout(() => {
+                floatingNum.remove();
+                
+                // If this is the last number, close the bin and update progress
+                if (i === floatingNums.length - 1) {
+                  setTimeout(() => {
+                    // Close the bin lid
+                    binLids[binIndex].classList.remove('open');
+                    
+                    // Update bin value and progress bar
+                    updateBinProgress(binIndex);
+                    
+                    // Clear selected numbers
+                    selectedNumbers = [];
+                    
+                    // Update quota
+                    updateQuota();
+                  }, 400);
+                }
+              }, 600);
+            }, i * 250); // Staggered throwing animation
+          });
+        }, 1000); // Wait for all numbers to reach center
+      }
+
+      // Update bin progress
+      function updateBinProgress(binIndex) {
+        // Store the previous value to check if bin is becoming full
+        const previousValue = binValues[binIndex];
+      
+        // Increment bin value
+        binValues[binIndex] += 10;
+        if (binValues[binIndex] > maxBinValue) binValues[binIndex] = maxBinValue;
+        
+        const percentage = (binValues[binIndex] / maxBinValue) * 100;
+        
+        // Update the appropriate progress bars based on bin index
+        if (binIndex === 0 || binIndex === 3) {
+          progressBars.orange[binIndex].style.height = `${percentage}%`;
+        }
+        if (binIndex === 1 || binIndex === 3) {
+          progressBars.green[binIndex].style.height = `${percentage}%`;
+        }
+        if (binIndex === 2 || binIndex === 3) {
+          progressBars.blue[binIndex].style.height = `${percentage}%`;
+        }
+        
+        // If this update makes the bin full or close to full, trigger a minor glitch
+        if (previousValue < 90 && binValues[binIndex] >= 90) {
+          // Bin is nearly full, trigger a small glitch
+          triggerGlitchPulse();
+        } else if (previousValue < 100 && binValues[binIndex] >= 100) {
+          // Bin is completely full, trigger a medium glitch
+          triggerGlitchTransition(`BIN ${binIndex + 1} AT CAPACITY`, "medium");
+        }
+        
+        addTerminalLog(`Bin ${binIndex + 1} updated to ${binValues[binIndex]}% capacity.`);
+      }
+
+      // Update quota display
+      function updateQuota() {
+        // Calculate quota based on total bin values
+        const totalBinValues = binValues.reduce((a, b) => a + b, 0);
+        const maxPossibleValue = maxBinValue * 4;
+        const newQuota = Math.min(Math.floor((totalBinValues / maxPossibleValue) * 100), 100);
+        
+        if (newQuota >= 100 && currentQuota < 100) {
+          addTerminalLog('QUOTA ACHIEVED. Well done. The work is mysterious and important.');
+          celebrateQuotaAchieved();
+        }
+        
+        currentQuota = newQuota;
+        quotaDisplay.textContent = currentQuota;
+        
+        // Also update the footer quota display
+        const footerQuotaDisplay = document.getElementById('footer-quota-display');
+        if (footerQuotaDisplay) {
+          footerQuotaDisplay.textContent = currentQuota;
+        }
+      }
+
+      // Celebratory effect
+      function celebrateQuotaAchieved() {
+        // First create a dramatic glitch effect when quota is achieved
+        triggerGlitchTransition("QUOTA COMPLETE", "high", () => {
+          // Play celebration sounds - sequence of startup sounds 
+          // to create a more impactful celebratory effect
+          setTimeout(() => playSound(startupSound, 0.4), 0);
+          setTimeout(() => playSound(sequenceSound, 0.5), 300);
+          setTimeout(() => playSound(binSound, 0.6), 600);
+          
+          // Visual celebration with number highlights
+          for (let i = 0; i < totalNumbers; i++) {
+            ((index) => {
+              setTimeout(() => {
+                const cell = numbersGrid.children[index];
+                if (cell) {
+                  cell.classList.add('number-highlighted');
+                  
+                  setTimeout(() => {
+                    cell.classList.remove('number-highlighted');
+                  }, 300);
+                }
+              }, index * 10);
+            })(i);
+          }
+          
+          // Reset the sequence after a delay when quota reaches 100%
+          setTimeout(() => {
+            // Create another glitch when resetting
+            triggerGlitchTransition("THE WORK IS MYSTERIOUS AND IMPORTANT", "medium", () => {
+              // Reset and prepare for the next sequence
+              resetSequence();
+              addTerminalLog('Quota achieved. Ready for new sequence.');
+              
+              // Auto-start a new sequence after a delay
+              setTimeout(() => {
+                if (!activeSequence) {
+                  startSequence();
+                }
+              }, 3000);
+            });
+          }, 2000);
+        });
+      }
+
+      // Add log to terminal output and console
+      function addTerminalLog(message) {
+        // Log to browser console
+        console.log(`MDR Terminal: ${message}`);
+        
+        // Also add to the terminal output div for reference
+        const logEntry = document.createElement('div');
+        logEntry.textContent = `> ${message}`;
+        terminalOutput.appendChild(logEntry);
+        terminalOutput.scrollTop = terminalOutput.scrollHeight;
+      }
+      
+      // Severance-style glitch effect functions
+      // This creates the disorienting transition effects seen in the show
+      
+      // Function to trigger a full glitch transition
+      function triggerGlitchTransition(message = "", intensity = "medium", callback = null) {
+        // Play glitch sound
+        playSound(glitchSound, 0.5);
+        
+        // Add active class to overlay to trigger animation
+        glitchOverlay.classList.add('active');
+        
+        // If we have a message, show it and add the line effect
+        if (message) {
+          glitchText.textContent = message;
+          glitchText.classList.add('active');
+          
+          // Add text distortion for more intensity
+          if (intensity === "high") {
+            glitchText.classList.add('glitch-text-effect');
+          }
+          
+          // Add the horizontal line effect
+          setTimeout(() => {
+            glitchLine.classList.add('active');
+          }, 100);
+        }
+        
+        // Screen flicker effect on terminal
+        document.querySelector('.terminal').classList.add('screen-flicker');
+        
+        // Remove all effects after animation completes
+        setTimeout(() => {
+          glitchOverlay.classList.remove('active');
+          glitchText.classList.remove('active', 'glitch-text-effect');
+          glitchLine.classList.remove('active');
+          document.querySelector('.terminal').classList.remove('screen-flicker');
+          
+          // If we have a callback, execute it
+          if (callback && typeof callback === 'function') {
+            callback();
+          }
+        }, intensity === "high" ? 2000 : 1500);
+      }
+      
+      // Function for smaller glitch pulses throughout the experience
+      function triggerGlitchPulse() {
+        // Quick flash with minor audio
+        glitchOverlay.style.animation = 'glitch-flash 0.2s forwards';
+        playSound(glitchSound, 0.2);
+        
+        // Add quick text distortion to all visible numbers
+        const numberCells = document.querySelectorAll('.number-cell.number-visible');
+        numberCells.forEach(cell => {
+          cell.classList.add('glitch-text-effect');
+        });
+        
+        // Remove effects after a short duration
+        setTimeout(() => {
+          glitchOverlay.style.animation = 'none';
+          numberCells.forEach(cell => {
+            cell.classList.remove('glitch-text-effect');
+          });
+        }, 300);
+      }
+      
+      // Random glitch pulses during the sequence
+      function startRandomGlitches() {
+        // Don't start if we're not in active sequence
+        if (!activeSequence) return;
+        
+        // Schedule random glitches
+        const glitchInterval = setInterval(() => {
+          // Only continue if still in active sequence
+          if (!activeSequence) {
+            clearInterval(glitchInterval);
+            return;
+          }
+          
+          // 20% chance of triggering a glitch pulse
+          if (Math.random() < 0.2) {
+            triggerGlitchPulse();
+          }
+        }, 8000 + Math.random() * 15000); // Random interval between 8-23 seconds
+        
+        return glitchInterval;
+      }
+
+      // Function to start the sequence
+      function startSequence() {
+        if (activeSequence) return;
+        
+        // Use a glitch transition effect first
+        triggerGlitchTransition("INITIATING SEQUENCE", "medium", () => {
+          // Play sequence start sound
+          playSound(sequenceSound, 0.7);
+          
+          // Hide the welcome messages
+          const terminalPrompt = document.querySelector('.terminal-prompt');
+          terminalPrompt.style.display = 'none';
+          
+          activeSequence = true;
+          startButton.textContent = 'SEQUENCE ACTIVE';
+          startButton.classList.add('button-active');
+          selectedNumbers = [];
+          currentQuota = 0;
+          quotaDisplay.textContent = '0';
+          
+          // Reset the footer quota display too
+          const footerQuotaDisplay = document.getElementById('footer-quota-display');
+          if (footerQuotaDisplay) {
+            footerQuotaDisplay.textContent = '0';
+          }
+          
+          // Log to console through addTerminalLog
+          addTerminalLog('Sequence initiated. Generating numbers...');
+          
+          const newNumbers = generateNumbers();
+          displayNumbersSequentially(newNumbers);
+          
+          // Start random glitches throughout the sequence
+          startRandomGlitches();
+        });
+      }
+      
+      // Function to reset the sequence
+      function resetSequence() {
+        // Use a more intense glitch transition effect for reset
+        triggerGlitchTransition("TERMINATING SEQUENCE", "high", () => {
+          // Play reset sound
+          playSound(resetSound, 0.6);
+          playSound(transitionSound, 0.4);
+          
+          activeSequence = false;
+          startButton.textContent = 'START SEQUENCE';
+          startButton.classList.remove('button-active');
+          
+          // Show the welcome messages again
+          const terminalPrompt = document.querySelector('.terminal-prompt');
+          terminalPrompt.style.display = 'block';
+          
+          // Log to console through addTerminalLog
+          addTerminalLog('System reset. Ready for new sequence.');
+          
+          initializeGrid();
+        });
+      }
+      
+      // Start button handler
+      startButton.addEventListener('click', startSequence);
+
+      // Reset button handler
+      resetButton.addEventListener('click', resetSequence);
+      
+      // Enter key trigger was moved to the top of the script
+
+      // Toggle bin panel handler
+      const binToggle = document.getElementById('bin-toggle');
+      const binInfoPanel = document.getElementById('bin-info-panel');
+      
+      binToggle.addEventListener('click', function() {
+        binInfoPanel.classList.toggle('expanded');
+        binToggle.textContent = binInfoPanel.classList.contains('expanded') ? '▼' : '▲';
+      });
+      
+      // Initialize bin panel in expanded state to ensure visibility
+      binInfoPanel.classList.add('expanded');
+      binToggle.textContent = '▼';
+      
+      // Setup numbers viewport with auto-scroll
+      const numbersViewport = document.getElementById('numbers-viewport');
+      
+      // Auto-scroll when mouse is near edges and apply proximity effect
+      numbersViewport.addEventListener('mousemove', function(e) {
+        const rect = numbersViewport.getBoundingClientRect();
+        
+        // Calculate the distance from each edge (relative to the viewport)
+        const distFromTop = e.clientY - rect.top;
+        const distFromLeft = e.clientX - rect.left;
+        const distFromRight = rect.right - e.clientX;
+        const distFromBottom = rect.bottom - e.clientY;
+        
+        // Define edge regions (50px from edge)
+        const edgeSize = 50;
+        
+        // Calculate scroll speed (max 15px per movement)
+        const maxSpeed = 15;
+        let verticalSpeed = 0;
+        let horizontalSpeed = 0;
+        
+        // Calculate vertical scroll speed
+        if (distFromTop < edgeSize) {
+          verticalSpeed = -maxSpeed * (1 - distFromTop / edgeSize);
+        } else if (distFromBottom < edgeSize) {
+          verticalSpeed = maxSpeed * (1 - distFromBottom / edgeSize);
+        }
+        
+        // Calculate horizontal scroll speed
+        if (distFromLeft < edgeSize) {
+          horizontalSpeed = -maxSpeed * (1 - distFromLeft / edgeSize);
+        } else if (distFromRight < edgeSize) {
+          horizontalSpeed = maxSpeed * (1 - distFromRight / edgeSize);
+        }
+        
+        // Apply scrolling
+        numbersViewport.scrollTop += verticalSpeed;
+        numbersViewport.scrollLeft += horizontalSpeed;
+        
+        // Apply an extremely strong and direct proximity effect for numbers
+        const numberCells = document.querySelectorAll('.number-cell.number-visible:not(.number-selected)');
+        let closestCell = null;
+        let closestDistance = Number.MAX_VALUE;
+        
+        // Process each visible number
+        numberCells.forEach(cell => {
+          // Get the number index from the dataset for rotation calculation
+          const numIndex = parseInt(cell.dataset.index) || 0;
+          
+          const cellRect = cell.getBoundingClientRect();
+          const cellCenterX = cellRect.left + cellRect.width / 2;
+          const cellCenterY = cellRect.top + cellRect.height / 2;
+          
+          // Calculate distance from mouse to cell center
+          const distance = Math.sqrt(
+            Math.pow(e.clientX - cellCenterX, 2) + 
+            Math.pow(e.clientY - cellCenterY, 2)
+          );
+          
+          // Track the closest cell
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestCell = cell;
+          }
+          
+          // More moderate sensitivity range - 120 pixels (reduced from 150)
+          // This creates a more focused area of effect
+          const maxDistance = 120;
+          
+          if (distance < maxDistance) {
+            // More moderate scaling effect - grows more subtly as you get closer
+            // Scale from 1.0 to 2.0 (reduced from 3.0 max)
+            const scale = 1 + (1 - distance / maxDistance) * 2.0;
+            
+            // Add minimal rotation for a subtle effect
+            const rotation = (1 - distance / maxDistance) * 3; // More subtle rotation, max 3 degrees
+            const rotationDirection = numIndex % 2 === 0 ? 1 : -1; // Alternate rotation direction
+            
+            cell.style.transform = `scale(${scale}) rotate(${rotation * rotationDirection}deg)`;
+            cell.style.zIndex = Math.floor((1 - distance / maxDistance) * 30); // Lower z-index (30 vs 40)
+            
+            // Add more subtle glow effect with text shadow and moderate brightness
+            const brightness = 100 + (1 - distance / maxDistance) * 200; // Reduced brightness (200 vs 350)
+            const glowIntensity = Math.floor((1 - distance / maxDistance) * 8); // Reduced glow (8 vs 12)
+            cell.style.filter = `brightness(${brightness}%)`;
+            cell.style.textShadow = `0 0 ${glowIntensity}px rgba(180, 210, 255, 0.6)`; // Lower opacity
+            
+            // Simpler color change
+            if (distance < maxDistance * 0.5) {
+              cell.style.color = '#e0f0ff';
+            } else {
+              cell.style.color = '#d6e6ff';
+            }
+            
+            // Always keep the jiggle animation, don't override it
+            // We're keeping the jiggle animation that's specified in CSS for .number-visible
+          } else {
+            // Reset to normal
+            cell.style.transform = 'scale(1) rotate(0deg)';
+            cell.style.zIndex = 0;
+            cell.style.filter = 'brightness(100%)';
+            cell.style.textShadow = '0 0 4px rgba(180, 210, 255, 0.4)';
+            cell.style.color = '#d6e6ff';
+            cell.style.animation = 'none';
+          }
+        });
+        
+        // Make the closest cell prominent but not too extreme
+        if (closestCell && closestDistance < 60) { // Slightly smaller trigger radius
+          // Get the closestCell index for variety in effects
+          const cellIndex = parseInt(closestCell.dataset.index) || 0;
+          
+          // More moderate scale for the closest number (2.8 vs 4.0)
+          const rotationFactor = cellIndex % 2 === 0 ? 1 : -1;
+          closestCell.style.transform = `scale(2.8) rotate(${rotationFactor * 2}deg)`;
+          
+          // Make it float on top of everything
+          closestCell.style.zIndex = '100';
+          
+          // More subtle glow effect
+          closestCell.style.filter = `brightness(250%) contrast(110%)`;
+          closestCell.style.textShadow = `0 0 8px rgba(100, 200, 255, 0.7)`;
+          
+          // More subtle color change
+          closestCell.style.color = '#e0f0ff';
+          
+          // Always maintain the jiggle effect for the closest number
+          closestCell.style.animation = 'jiggle 0.7s infinite alternate ease-in-out';
+        }
+      });
+      
+      // Reset visual styles but keep the jiggle animation when mouse leaves viewport
+      numbersViewport.addEventListener('mouseleave', function() {
+        if (activeSequence) {
+          const numberCells = document.querySelectorAll('.number-cell.number-visible:not(.number-selected)');
+          numberCells.forEach(cell => {
+            cell.style.transform = 'scale(1) rotate(0deg)';
+            cell.style.zIndex = 0;
+            cell.style.filter = 'brightness(100%)';
+            cell.style.textShadow = '0 0 4px rgba(180, 210, 255, 0.4)';
+            cell.style.color = '#a5ddff'; // Keep the lighter blue color
+            // Don't reset the animation, let the jiggle continue
+          });
+        }
+      });
+      
+      // Mouse movement viewport follow effect
+      document.addEventListener('mousemove', function(e) {
+        const terminalContent = document.querySelector('.terminal-content');
+        const container = document.querySelector('.terminal');
+        const xPercentage = e.clientX / window.innerWidth;
+        const yPercentage = e.clientY / window.innerHeight;
+        
+        // Calculate small shifts based on mouse position (max 15px in any direction)
+        const maxShiftX = 15;
+        const maxShiftY = 15;
+        const shiftX = (xPercentage - 0.5) * 2 * maxShiftX;
+        const shiftY = (yPercentage - 0.5) * 2 * maxShiftY;
+        
+        // Apply the transform to create subtle viewport following
+        terminalContent.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+      });
+      
+      // Add click event listener to start the sequence on any click 
+      // in the welcome screen area
+      document.querySelector('.terminal-prompt').addEventListener('click', function() {
+        if (!activeSequence) {
+          startSequence();
+        }
+      });
+      
+      // Add click to terminal header to also start sequence
+      document.querySelector('.terminal-header').addEventListener('click', function() {
+        if (!activeSequence) {
+          startSequence();
+        }
+      });
+      
+      // Add click to entire terminal content area to start sequence
+      document.querySelector('.terminal-content').addEventListener('click', function(e) {
+        // Only start if:
+        // 1. We're not already in a sequence
+        // 2. This isn't a click on a number (which has its own handler)
+        if (!activeSequence && !e.target.classList.contains('number-cell')) {
+          startSequence();
+        }
+      });
+      
+      // Initialize on load
+      initializeGrid();
+      addTerminalLog('MDR Terminal v3.7.42 initialized');
+      addTerminalLog('Welcome, Mark. Please select START to begin your work.');
+      addTerminalLog('Click anywhere on screen to begin sequence.');
+    });
+  </script>
+</body>
+</html>
