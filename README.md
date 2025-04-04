@@ -25,7 +25,7 @@ TODO:
 - Make the AI strategies finally work and make a single line.
 - Teach the AI to "soft land" a piece as a single lateral movement, after rotating the piece or not, to fill a gap.
 
-![one file blocks](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-auto-tetris.jpeg)
+![onefile-auto-tetris](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-auto-tetris.jpeg)
 
 onefile-guitar-tab-youtube
 ==========================
@@ -35,7 +35,7 @@ TODO:
 - Adjust the playing scroll position not to get out of sight.
 - Make the video-score sync work.
 
-![one file blocks](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-guitar-tab-youtube.jpeg)
+![onefile-guitar-tab-youtube](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-guitar-tab-youtube.jpeg)
 
 onefile-zx-spectrum-v2
 ======================
@@ -47,4 +47,15 @@ TODO:
 - Add the ability to load .z80, .sna, .tap and .tzx files.
 - AY sound support.
 
-![one file blocks](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-zx-spectrum-v2.png)
+![onefile-zx-spectrum-v2](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-zx-spectrum-v2.png)
+
+onefile-severance-terminal
+==========================
+A Severance terminal emulator, features almost everything you can expect from a terminal computer for the Macrodata Refinement department (Lumon Industries). Press ENTER or click the screen to start refining your data assignment, select three "scary numbers" and they will be stored in one of the four bins, randomly, until you complete your quota. The work is mysterious and important.
+
+TODO:
+- Learn Milchick's dance moves.
+- Tell Cobel to unfold the history behind her studies.
+- Be ever merry.
+
+![onefile-severance-terminal](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-severance-terminal.png)
