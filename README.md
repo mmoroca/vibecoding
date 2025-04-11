@@ -69,4 +69,4 @@ TODO:
 - Make sure the dwaing cards functionality is working.
 - Test different "house" rules combinations.
 
-!UNO-v2.BAS](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/UNO-v2_BAS.png)
+![UNO-v2.BAS](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/UNO-v2_BAS.png)
