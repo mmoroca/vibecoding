@@ -59,3 +59,14 @@ TODO:
 - Be ever merry.
 
 ![onefile-severance-terminal](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/onefile-severance-terminal.png)
+
+UNO-v2.BAS
+==========
+An UNO card game for GW-BASIC to play on your MS-DOS machine. Features up to 4 players, 3 of them computer played, a set of "house" rules that you can enable such as "Progressive Draw 2/4 (stack drawing cards)", "Draw Until You Can Play" and more.
+
+TODO:
+- Set the right colors for the playing cards.
+- Make sure the dwaing cards functionality is working.
+- Test different "house" rules combinations.
+
+!UNO-v2.BAS](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/UNO-v2_BAS.png)
