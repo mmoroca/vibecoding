@@ -66,7 +66,7 @@ An UNO card game for GW-BASIC to play on your MS-DOS machine. Features up to 4 p
 
 TODO:
 - Set the right colors for the playing cards.
-- Make sure the dwaing cards functionality is working.
+- Make sure the drawing cards functionality is working.
 - Test different "house" rules combinations.
 
 ![UNO-v2.BAS](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/UNO-v2_BAS.png)
