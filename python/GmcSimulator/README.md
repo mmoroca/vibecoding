@@ -1,6 +1,7 @@
 # GMC-4 Simulator
 
 A Python-based simulator for the GMC-4 4-bit microcomputer with a graphical interface that mimics the original hardware.
+![onefile-severance-terminal](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/GmcSimulator.png)
 
 ## Overview
 
