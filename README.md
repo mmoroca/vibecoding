@@ -73,7 +73,12 @@ TODO:
 
 play_mod.c
 ==========
-A simple module music player written in C ussing [SDL2](https://github.com/libsdl-org) and [libxmp](https://github.com/libxmp/libxmp) libraries. It can play multiple file formats (.MOD, .S·M, .IT, .XM, etc.) and features a simple visualizer. 
+A simple module music player written in C ussing [SDL2](https://github.com/libsdl-org) and [libxmp](https://github.com/libxmp/libxmp) libraries. It can play multiple file formats (.MOD, .S·M, .IT, .XM, etc.) and features a simple visualizer.
+
+How to compile:
+```
+gcc play_mod.c -o play_mod -lSDL2 -lSDL2_ttf -lxmp
+```
 
 TODO:
 - Maybe a simple playlist or info window.
