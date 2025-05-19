@@ -70,3 +70,13 @@ TODO:
 - Test different "house" rules combinations.
 
 ![UNO-v2.BAS](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/UNO-v2_BAS.png)
+
+play_mod.c
+==========
+A simple module music player written in C ussing [SDL2](https://github.com/libsdl-org) and [libxmp](https://github.com/libxmp/libxmp) libraries. It can play multiple file formats (.MOD, .S·M, .IT, .XM, etc.) and features a simple visualizer. 
+
+TODO:
+- Maybe a simple playlist or info window.
+
+![play_mod.c](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/play_mod_main.png)
+![play_mod.c](https://raw.githubusercontent.com/mmoroca/vibecoding/refs/heads/main/images/play_mod_channels.png)
